@@ -82,6 +82,12 @@ spring:
         dialect: org.hibernate.dialect.MySQLDialect
         format_sql: true
 
+  # Spring Boot 4: MongoDB settings live under spring.mongodb (the old
+  # spring.data.mongodb.uri is deprecated and silently IGNORED — that is why
+  # the container kept dialling localhost:27017 despite MONGODB_URI being set).
+  mongodb:
+    uri: ${MONGODB_URI:mongodb://localhost:27017/crm}
+
   data:
     redis:
       host: ${REDIS_HOST:localhost}
@@ -91,10 +97,6 @@ spring:
       # JPA/Mongo repository at boot and logging a "store assignment" line each.
       repositories:
         enabled: false
-    mongodb:
-      # Never hardcode credentials here — production sets MONGODB_URI via .env /
-      # docker-compose, e.g. mongodb://user:pass@mongo:27017/crm?authSource=admin
-      uri: ${MONGODB_URI:mongodb://localhost:27017/crm}
 
   # Kafka — queues WhatsApp campaign sends and webhook delivery reports (DLRs).
   # The app boots fine when the broker is down (producers fall back to inline
@@ -129,6 +131,9 @@ spring:
         request.timeout.ms: 5000
     listener:
       missing-topics-fatal: false
+      # Compose sets KAFKA_LISTENERS_ENABLED=false (no broker) so the consumers
+      # never start; producers already fall back to inline processing.
+      auto-startup: ${KAFKA_LISTENERS_ENABLED:true}
 
   # OAuth2 social login (ported from the auth service). The placeholder
   # defaults let the application boot without real credentials; set the env

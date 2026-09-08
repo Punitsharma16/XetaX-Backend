@@ -37,6 +37,7 @@ services:
       APP_UPLOAD_DIR: /app/uploads
       JWT_COOKIE_SECURE: "true"
       JPA_SHOW_SQL: "false"
+      KAFKA_LISTENERS_ENABLED: "false"
 
       # Heap 700m inside a 1100m container: leaves room for metaspace, threads,
       # Mongo/MySQL drivers and the Groq HTTP client — no OOM-kill at peak.
