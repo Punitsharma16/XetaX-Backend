@@ -82,6 +82,7 @@ public class Oauth2SuccessHandler implements AuthenticationSuccessHandler {
                                     .image(picture)
                                     .provider(LoginProvider.GOOGLE)
                                     .isEnable(true)
+                                    .emailVerified(true)
                                     .isAdmin(false)
                                     .parentId(null)
                                     .password(UUID.randomUUID().toString())

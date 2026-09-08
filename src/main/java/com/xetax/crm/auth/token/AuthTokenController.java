@@ -84,6 +84,11 @@ public class AuthTokenController {
             logger.warn("User is disabled: {}", user.getEmail());
             throw new DisabledException("User is disabled");
         }
+        if (Boolean.FALSE.equals(user.getEmailVerified())) {
+            // The SPA reads this exact reason and sends the user to /verify-email.
+            throw new org.springframework.web.server.ResponseStatusException(
+                    org.springframework.http.HttpStatus.FORBIDDEN, "EMAIL_NOT_VERIFIED");
+        }
 
         String jti = UUID.randomUUID().toString();
         var refreshTokenOb = RefreshToken.builder()

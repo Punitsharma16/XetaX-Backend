@@ -40,6 +40,12 @@ public class AuthUserEntity implements UserDetails {
     @Enumerated(EnumType.STRING)
     private LoginProvider provider;
 
+    /**
+     * Sign-up email confirmed? null = legacy account created before the check
+     * existed (treated as verified); false = must confirm before signing in.
+     */
+    private Boolean emailVerified;
+
     @PrePersist
     protected void onCreate() {
         Instant now = Instant.now();

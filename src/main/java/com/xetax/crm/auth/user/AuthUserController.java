@@ -1,5 +1,6 @@
 package com.xetax.crm.auth.user;
 
+import com.xetax.crm.auth.verify.EmailVerificationService;
 import lombok.AllArgsConstructor;
 import lombok.NoArgsConstructor;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -18,6 +19,9 @@ import org.springframework.web.bind.annotation.*;
 @NoArgsConstructor
 public class AuthUserController {
 
+    @org.springframework.beans.factory.annotation.Autowired
+    private EmailVerificationService verificationService;
+
     @Autowired
     AuthUserService userService;
 
@@ -35,9 +39,22 @@ public class AuthUserController {
         userDto.setAdmin(false);
         userDto.setEnable(true);
         userDto.setParentId(null);
+        // Email must be confirmed before the first sign-in (only when SMTP can
+        // actually deliver the code — otherwise the account is live at once).
+        boolean mustVerify = verificationService.verificationRequired();
+        userDto.setEmailVerified(!mustVerify);
 
-        return ResponseEntity.status(HttpStatus.CREATED)
-                .body(userService.createUser(userDto));
+        AuthUserDto created = userService.createUser(userDto);
+        if (mustVerify) {
+            try {
+                verificationService.sendCode(created.getEmail() == null ? "" : created.getEmail().trim().toLowerCase());
+            } catch (Exception e) {
+                // Account exists; the verify page offers "Send it again".
+                org.slf4j.LoggerFactory.getLogger(AuthUserController.class)
+                        .warn("Verification code not sent for {}: {}", created.getEmail(), e.getMessage());
+            }
+        }
+        return ResponseEntity.status(HttpStatus.CREATED).body(created);
     }
 
     /**

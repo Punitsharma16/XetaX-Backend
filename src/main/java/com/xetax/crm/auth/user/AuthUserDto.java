@@ -33,6 +33,7 @@ public class AuthUserDto implements Serializable {
     private String phone;
     private String company;
     private String parentId;
+    private Boolean emailVerified;
     private Instant createAt = Instant.now();
     private Instant updateAt = Instant.now();
     private LoginProvider provider;

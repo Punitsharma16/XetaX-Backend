@@ -68,6 +68,7 @@ public class SecurityConfig {
                                 "/auth/v1/logoutRefreshToken",
                                 "/auth/v1/forgot-password",
                                 "/auth/v1/reset-password",
+                                "/auth/v1/verify-email/**",
                                 "/auth/api/v1/users/register").permitAll()
                         .requestMatchers(
                                 "/oauth2/**",
