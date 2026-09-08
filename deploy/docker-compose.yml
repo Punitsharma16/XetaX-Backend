@@ -198,7 +198,7 @@ services:
 
   qdrant:
 
-    image: qdrant/qdrant:v1.15.4
+    image: qdrant/qdrant:v1.17.0   # matches the Java client (1.17) — minor versions must be within 1
 
     restart: unless-stopped
 
