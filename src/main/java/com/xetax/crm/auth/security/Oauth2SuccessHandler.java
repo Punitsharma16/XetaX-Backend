@@ -12,6 +12,12 @@ import jakarta.servlet.http.HttpServletResponse;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.beans.factory.annotation.Value;
+import com.fasterxml.jackson.databind.ObjectMapper;
+import java.nio.charset.StandardCharsets;
+import java.util.Base64;
+import java.util.LinkedHashMap;
+import java.util.Map;
 import org.springframework.security.core.Authentication;
 import org.springframework.security.oauth2.client.authentication.OAuth2AuthenticationToken;
 import org.springframework.security.oauth2.core.user.OAuth2User;
@@ -33,6 +39,10 @@ public class Oauth2SuccessHandler implements AuthenticationSuccessHandler {
     CookieService cookieService;
     @Autowired
     AuthTokenRepository refreshTokenRepository;
+
+    /** Where the SPA lives — the browser is sent back here with the tokens. */
+    @Value("${app.public-base-url:http://localhost:5000}")
+    String publicBaseUrl;
 
     @Override
     public void onAuthenticationSuccess(HttpServletRequest request, HttpServletResponse response, FilterChain chain,
@@ -62,11 +72,20 @@ public class Oauth2SuccessHandler implements AuthenticationSuccessHandler {
                         })
                         .orElseGet(() -> {
                             logger.info("Creating new user");
+                            // Google sign-up == self-service register: an enabled
+                            // workspace owner (no parent, not system admin). The
+                            // random password can never be typed, so the account
+                            // is Google-only until the user sets one from Profile.
                             AuthUserEntity newUser = AuthUserEntity.builder()
-                                    .name(name)
+                                    .name(name == null || name.isBlank() ? email : name)
                                     .email(email)
                                     .image(picture)
                                     .provider(LoginProvider.GOOGLE)
+                                    .isEnable(true)
+                                    .isAdmin(false)
+                                    .parentId(null)
+                                    .password(UUID.randomUUID().toString())
+                                    .createAt(Instant.now())
                                     .build();
                             return userRepository.save(newUser);
                         });
@@ -86,6 +105,32 @@ public class Oauth2SuccessHandler implements AuthenticationSuccessHandler {
         refreshTokenRepository.save(refreshTokenObj);
         String refreshToken = jwtService.generateRefreshToken(user1, refreshTokenObj.getJti());
         cookieService.attachRefreshCookie(response, refreshToken, (int) jwtService.getRefreshTtlSeconds());
-        response.getWriter().write("Login Successful");
+
+        if (!user1.isEnabled()) {
+            response.sendRedirect(publicBaseUrl + "/login?oauth=disabled");
+            return;
+        }
+
+        // Hand the session to the SPA exactly like /auth/v1/login does — access +
+        // refresh token and the user DTO. They travel in the URL *fragment*, which
+        // browsers never send to servers (so nothing lands in access logs).
+        String accessToken = jwtService.generateAccessToken(user1);
+        Map<String, Object> dto = new LinkedHashMap<>();
+        dto.put("id", user1.getId());
+        dto.put("email", user1.getEmail());
+        dto.put("name", user1.getName());
+        dto.put("image", user1.getImage());
+        dto.put("phone", user1.getPhone());
+        dto.put("company", user1.getCompany());
+        dto.put("parentId", user1.getParentId());
+        dto.put("provider", user1.getProvider());
+        dto.put("enable", user1.isEnabled());
+        dto.put("admin", user1.isAdmin());
+        String userJson = new ObjectMapper().writeValueAsString(dto);
+        String userB64 = Base64.getUrlEncoder().withoutPadding()
+                .encodeToString(userJson.getBytes(StandardCharsets.UTF_8));
+
+        response.sendRedirect(publicBaseUrl + "/oauth/callback#access_token=" + accessToken
+                + "&refresh_token=" + refreshToken + "&user=" + userB64);
     }
 }

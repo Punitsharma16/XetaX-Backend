@@ -8,112 +8,251 @@
 name: xetax
 
 services:
+
   app:
     build:
       context: ..
       dockerfile: deploy/Dockerfile
-    image: xetax/crm:latest
+
+    image: xetax/crm:1.0.0
+
     restart: unless-stopped
-    env_file: .env
+
+    env_file:
+      - .env
+
     environment:
-      # Wire the app to the sibling containers — these override .env.
+      SPRING_PROFILES_ACTIVE: prod
+
       DB_URL: jdbc:mysql://mysql:3306/crm?useSSL=false&allowPublicKeyRetrieval=true&serverTimezone=Asia/Kolkata
-      MONGODB_URI: mongodb://mongo:27017/crm
+      MONGODB_URI: mongodb://${MONGO_USERNAME}:${MONGO_PASSWORD}@mongo:27017/crm?authSource=admin
+
       REDIS_HOST: redis
-      REDIS_PORT: "6379"
+      REDIS_PORT: 6379
+
       QDRANT_HOST: qdrant
+      QDRANT_PORT: 6334   # gRPC — the app does not use the 6333 REST port
+      QDRANT_API_KEY: ${QDRANT_API_KEY}
+
       APP_UPLOAD_DIR: /app/uploads
       JWT_COOKIE_SECURE: "true"
-      SPRING_PROFILES_ACTIVE: prod
+
+      # Heap 700m inside a 1100m container: leaves room for metaspace, threads,
+      # Mongo/MySQL drivers and the Groq HTTP client — no OOM-kill at peak.
+      JAVA_TOOL_OPTIONS: >
+        -Xms256m
+        -Xmx700m
+        -XX:+UseG1GC
+        -XX:+ExitOnOutOfMemoryError
+
+    depends_on:
+      mysql:
+        condition: service_healthy
+      mongo:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+      qdrant:
+        condition: service_started
+
     volumes:
       - uploads:/app/uploads
-    depends_on:
-      mysql:   { condition: service_healthy }
-      mongo:   { condition: service_healthy }
-      redis:   { condition: service_healthy }
-      qdrant:  { condition: service_started }
+
     mem_limit: 1100m
+
     healthcheck:
-      test: ["CMD-SHELL", "curl -fs http://localhost:8085/actuator/health | grep -q UP"]
+      test:
+        [
+          "CMD-SHELL",
+          "curl -fs http://localhost:8085/actuator/health | grep -q UP || exit 1"
+        ]
       interval: 30s
       timeout: 5s
       retries: 5
       start_period: 90s
 
+    logging:
+      driver: json-file
+      options:
+        max-size: "10m"
+        max-file: "3"
+
+
+
   mysql:
-    image: mysql:8.4
+
+    image: mysql:8.4.6
+
     restart: unless-stopped
+
     environment:
       MYSQL_ROOT_PASSWORD: ${DB_PASSWORD}
       MYSQL_DATABASE: crm
       TZ: Asia/Kolkata
+
     command: >
       --innodb-buffer-pool-size=256M
       --max-connections=80
       --character-set-server=utf8mb4
       --collation-server=utf8mb4_unicode_ci
+      --skip-name-resolve
+
     volumes:
-      - mysql-data:/var/lib/mysql
+      - ./data/mysql:/var/lib/mysql
+
+    mem_limit: 420m
+
     healthcheck:
-      test: ["CMD", "mysqladmin", "ping", "-h", "localhost", "-uroot", "-p${DB_PASSWORD}"]
+      test:
+        [
+          "CMD",
+          "mysqladmin",
+          "ping",
+          "-h",
+          "localhost",
+          "-uroot",
+          "-p${DB_PASSWORD}"
+        ]
       interval: 10s
       timeout: 5s
-      retries: 12
-    mem_limit: 512m
+      retries: 10
+
+    logging:
+      driver: json-file
+      options:
+        max-size: "5m"
+        max-file: "2"
+
+
 
   mongo:
-    image: mongo:7
+
+    image: mongo:7.0.14
+
     restart: unless-stopped
-    command: ["--wiredTigerCacheSizeGB", "0.25"]
+
+    environment:
+      MONGO_INITDB_ROOT_USERNAME: ${MONGO_USERNAME}
+      MONGO_INITDB_ROOT_PASSWORD: ${MONGO_PASSWORD}
+
+    command:
+      - --auth
+      - --wiredTigerCacheSizeGB
+      - "0.25"
+
     volumes:
-      - mongo-data:/data/db
+      - ./data/mongo:/data/db
+
+    mem_limit: 320m
+
     healthcheck:
-      test: ["CMD", "mongosh", "--quiet", "--eval", "db.runCommand({ping:1}).ok"]
-      interval: 10s
+      test:
+        [
+          "CMD",
+          "mongosh",
+          "--quiet",
+          "--eval",
+          "db.adminCommand('ping')"
+        ]
+      interval: 15s
       timeout: 5s
-      retries: 12
-    mem_limit: 400m
+      retries: 10
+
+    logging:
+      driver: json-file
+      options:
+        max-size: "5m"
+        max-file: "2"
+
+
 
   redis:
-    image: redis:7-alpine
+
+    image: redis:7.4-alpine
+
     restart: unless-stopped
-    command: ["redis-server", "--maxmemory", "128mb", "--maxmemory-policy", "allkeys-lru", "--save", "60", "1"]
+
+    command:
+      - redis-server
+      - --maxmemory
+      - 128mb
+      - --maxmemory-policy
+      - allkeys-lru
+      - --save
+      - "60"
+      - "1"
+
     volumes:
-      - redis-data:/data
+      - ./data/redis:/data
+
+    mem_limit: 150m
+
     healthcheck:
-      test: ["CMD", "redis-cli", "ping"]
+      test: ["CMD","redis-cli","ping"]
       interval: 10s
       timeout: 3s
-      retries: 12
-    mem_limit: 160m
+      retries: 10
+
+    logging:
+      driver: json-file
+      options:
+        max-size: "5m"
+        max-file: "2"
+
+
 
   qdrant:
-    image: qdrant/qdrant:v1.12.4
+
+    image: qdrant/qdrant:v1.15.4
+
     restart: unless-stopped
+
+    environment:
+      QDRANT__SERVICE__API_KEY: ${QDRANT_API_KEY}
+
     volumes:
-      - qdrant-data:/qdrant/storage
-    mem_limit: 400m
+      - ./data/qdrant:/qdrant/storage
+
+    mem_limit: 256m
+
+    logging:
+      driver: json-file
+      options:
+        max-size: "5m"
+        max-file: "2"
+
+
 
   caddy:
-    image: caddy:2-alpine
+
+    image: caddy:2.10-alpine
+
     restart: unless-stopped
+
+    depends_on:
+      app:
+        condition: service_healthy
+
     ports:
       - "80:80"
       - "443:443"
+
     volumes:
       - ./Caddyfile:/etc/caddy/Caddyfile:ro
-      - ./frontend:/srv/frontend:ro      # ng build output (dist/xetax-crm-ui/browser/*)
-      - ./website:/srv/website:ro        # marketing site (optional)
-      - caddy-data:/data                 # Let's Encrypt certs — keep this volume!
+      - caddy-data:/data
       - caddy-config:/config
-    depends_on:
-      - app
+
+    mem_limit: 80m
+
+    logging:
+      driver: json-file
+      options:
+        max-size: "5m"
+        max-file: "2"
+
+
 
 volumes:
-  mysql-data:
-  mongo-data:
-  redis-data:
-  qdrant-data:
   uploads:
   caddy-data:
   caddy-config:

@@ -41,6 +41,9 @@ import java.util.List;
 @EnableWebSecurity
 public class SecurityConfig {
 
+    @org.springframework.beans.factory.annotation.Value("${app.public-base-url:http://localhost:5000}")
+    private String publicBaseUrl;
+
     /** Panel origins allowed to call the API — env-driven for production. */
     @org.springframework.beans.factory.annotation.Value("${app.cors-origins}")
     private String corsOrigins;
@@ -82,7 +85,10 @@ public class SecurityConfig {
                         .anyRequest().authenticated())
                 .httpBasic(AbstractHttpConfigurer::disable)
                 .formLogin(AbstractHttpConfigurer::disable)
-                .oauth2Login(oauth2 -> oauth2.successHandler(oauth2SuccessHandler))
+                .oauth2Login(oauth2 -> oauth2
+                        .successHandler(oauth2SuccessHandler)
+                        .failureHandler((request, response, exception) ->
+                                response.sendRedirect(publicBaseUrl + "/login?oauth=failed")))
                 .exceptionHandling(ex -> ex
                         .authenticationEntryPoint((request, response, authException) -> {
                             response.setStatus(HttpServletResponse.SC_UNAUTHORIZED);

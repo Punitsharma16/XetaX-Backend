@@ -22,7 +22,9 @@ spring:
     vectorstore:
       qdrant:
         host: ${QDRANT_HOST:localhost}
-        port: 6334
+        # gRPC port (Spring AI talks gRPC, not the 6333 REST port).
+        port: ${QDRANT_PORT:6334}
+        api-key: ${QDRANT_API_KEY:}
         collection-name: xetax-knowledge
         content-field-name: doc_content
         use-tls: false

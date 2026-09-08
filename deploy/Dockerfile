@@ -19,13 +19,6 @@ RUN apt-get update && apt-get install -y --no-install-recommends curl \
 USER xetax
 COPY --from=build /app.jar /app/crm.jar
 EXPOSE 8085
-# -XX:MaxRAMPercentage lets the JVM size itself from the container limit
-# (mem_limit in compose) instead of a hard-coded -Xmx.
-ENTRYPOINT [
-"java",
-"-XX:MaxRAMPercentage=70",
-"-XX:InitialRAMPercentage=20",
-"-XX:+UseG1GC",
-"-jar",
-"/app/crm.jar"
-]
+# JVM sizing lives in docker-compose.yml (JAVA_TOOL_OPTIONS), next to the
+# container's mem_limit — one place to tune, no conflicting flags here.
+ENTRYPOINT ["java", "-jar", "/app/crm.jar"]
