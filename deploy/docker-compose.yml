@@ -1,0 +1,119 @@
+# XetaX CRM — full production stack on ONE box.
+#   cd crm/deploy && cp .env.prod.example .env && edit .env && docker compose up -d --build
+#
+# Services: app (Spring Boot) · mysql · mongo · redis · qdrant · caddy (HTTPS + frontend + website)
+# Kafka is intentionally NOT here — the app falls back to inline processing.
+# Only caddy publishes ports (80/443). Every database is internal-only.
+
+name: xetax
+
+services:
+  app:
+    build:
+      context: ..
+      dockerfile: deploy/Dockerfile
+    image: xetax/crm:latest
+    restart: unless-stopped
+    env_file: .env
+    environment:
+      # Wire the app to the sibling containers — these override .env.
+      DB_URL: jdbc:mysql://mysql:3306/crm?useSSL=false&allowPublicKeyRetrieval=true&serverTimezone=Asia/Kolkata
+      MONGODB_URI: mongodb://mongo:27017/crm
+      REDIS_HOST: redis
+      REDIS_PORT: "6379"
+      QDRANT_HOST: qdrant
+      APP_UPLOAD_DIR: /app/uploads
+      JWT_COOKIE_SECURE: "true"
+      SPRING_PROFILES_ACTIVE: prod
+    volumes:
+      - uploads:/app/uploads
+    depends_on:
+      mysql:   { condition: service_healthy }
+      mongo:   { condition: service_healthy }
+      redis:   { condition: service_healthy }
+      qdrant:  { condition: service_started }
+    mem_limit: 1100m
+    healthcheck:
+      test: ["CMD-SHELL", "curl -fs http://localhost:8085/actuator/health | grep -q UP"]
+      interval: 30s
+      timeout: 5s
+      retries: 5
+      start_period: 90s
+
+  mysql:
+    image: mysql:8.4
+    restart: unless-stopped
+    environment:
+      MYSQL_ROOT_PASSWORD: ${DB_PASSWORD}
+      MYSQL_DATABASE: crm
+      TZ: Asia/Kolkata
+    command: >
+      --innodb-buffer-pool-size=256M
+      --max-connections=80
+      --character-set-server=utf8mb4
+      --collation-server=utf8mb4_unicode_ci
+    volumes:
+      - mysql-data:/var/lib/mysql
+    healthcheck:
+      test: ["CMD", "mysqladmin", "ping", "-h", "localhost", "-uroot", "-p${DB_PASSWORD}"]
+      interval: 10s
+      timeout: 5s
+      retries: 12
+    mem_limit: 512m
+
+  mongo:
+    image: mongo:7
+    restart: unless-stopped
+    command: ["--wiredTigerCacheSizeGB", "0.25"]
+    volumes:
+      - mongo-data:/data/db
+    healthcheck:
+      test: ["CMD", "mongosh", "--quiet", "--eval", "db.runCommand({ping:1}).ok"]
+      interval: 10s
+      timeout: 5s
+      retries: 12
+    mem_limit: 400m
+
+  redis:
+    image: redis:7-alpine
+    restart: unless-stopped
+    command: ["redis-server", "--maxmemory", "128mb", "--maxmemory-policy", "allkeys-lru", "--save", "60", "1"]
+    volumes:
+      - redis-data:/data
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 10s
+      timeout: 3s
+      retries: 12
+    mem_limit: 160m
+
+  qdrant:
+    image: qdrant/qdrant:v1.12.4
+    restart: unless-stopped
+    volumes:
+      - qdrant-data:/qdrant/storage
+    mem_limit: 400m
+
+  caddy:
+    image: caddy:2-alpine
+    restart: unless-stopped
+    ports:
+      - "80:80"
+      - "443:443"
+    volumes:
+      - ./Caddyfile:/etc/caddy/Caddyfile:ro
+      - ./frontend:/srv/frontend:ro      # ng build output (dist/xetax-crm-ui/browser/*)
+      - ./website:/srv/website:ro        # marketing site (optional)
+      - caddy-data:/data                 # Let's Encrypt certs — keep this volume!
+      - caddy-config:/config
+    depends_on:
+      - app
+
+volumes:
+  mysql-data:
+  mongo-data:
+  redis-data:
+  qdrant-data:
+  uploads:
+  caddy-data:
+  caddy-config:

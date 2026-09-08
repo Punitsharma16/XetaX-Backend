@@ -1,0 +1,204 @@
+server:
+  port: 8085
+
+spring:
+  application:
+    name: crm
+
+  ai:
+    openai:
+      api-key: ${GROQ_API_KEY:}
+      base-url: https://api.groq.com/openai/v1
+      chat:
+        # Env-switchable — reasoning models (gpt-oss) think long on tool calls;
+        # llama-3.3-70b answers tool rounds far faster on Groq.
+        model: ${GROQ_CHAT_MODEL:openai/gpt-oss-20b}
+
+      embedding:
+        api-key: ${COHERE_API_KEY:}
+        base-url: https://api.cohere.ai/compatibility/v1
+        model: embed-v4.0
+
+    vectorstore:
+      qdrant:
+        host: ${QDRANT_HOST:localhost}
+        port: 6334
+        collection-name: xetax-knowledge
+        content-field-name: doc_content
+        use-tls: false
+        # false => no Qdrant connection at BOOT, so the panel stays up even
+        # when the vector DB is down (AI knowledge degrades gracefully).
+        # Set QDRANT_INIT_SCHEMA=true once on a brand-new deployment to
+        # create the collection, then turn it back off.
+        initialize-schema: ${QDRANT_INIT_SCHEMA:false}
+
+
+  # SMTP for outgoing email (meeting invites, SEND_EMAIL automations).
+  # Leave SMTP_HOST empty => email disabled; EmailService logs instead of failing.
+  # Gmail example: host smtp.gmail.com, port 587, username = your gmail,
+  # password = App Password (Google Account -> Security -> App passwords).
+  mail:
+    host: ${SMTP_HOST:}
+    port: ${SMTP_PORT:587}
+    username: ${SMTP_USERNAME:}
+    password: ${SMTP_PASSWORD:}
+    properties:
+      mail:
+        smtp:
+          auth: true
+          starttls:
+            enable: true
+
+  servlet:
+    multipart:
+      max-file-size: 5MB
+      max-request-size: 6MB
+
+  datasource:
+    url: ${DB_URL:jdbc:mysql://localhost:3306/crm}
+    username: ${DB_USERNAME:root}
+    password: ${DB_PASSWORD:redhat}
+    driver-class-name: com.mysql.cj.jdbc.Driver
+
+  jpa:
+    hibernate:
+      ddl-auto: update
+
+    show-sql: true
+
+    properties:
+      hibernate:
+        dialect: org.hibernate.dialect.MySQLDialect
+        format_sql: true
+
+  data:
+    redis:
+      host: ${REDIS_HOST:localhost}
+      port: ${REDIS_PORT:6379}
+    mongodb:
+      uri: ${MONGODB_URI:mongodb://localhost:27017/crm}
+
+  # Kafka — queues WhatsApp campaign sends and webhook delivery reports (DLRs).
+  # The app boots fine when the broker is down (producers fall back to inline
+  # processing); start Kafka with the docker command in XETAX_KAFKA_GUIDE.md.
+  kafka:
+    bootstrap-servers: ${KAFKA_BOOTSTRAP_SERVERS:localhost:9092}
+    # Shared client settings: without a backoff the Kafka clients hammer a
+    # down broker in a tight loop and flood the logs; with these the app
+    # boots normally and retries quietly until the broker appears.
+    properties:
+      reconnect.backoff.ms: 1000
+      reconnect.backoff.max.ms: 30000
+    admin:
+      fail-fast: false
+      properties:
+        default.api.timeout.ms: 5000
+        request.timeout.ms: 5000
+    consumer:
+      group-id: xetax-crm
+      auto-offset-reset: earliest
+      key-deserializer: org.apache.kafka.common.serialization.StringDeserializer
+      value-deserializer: org.apache.kafka.common.serialization.StringDeserializer
+    producer:
+      key-serializer: org.apache.kafka.common.serialization.StringSerializer
+      value-serializer: org.apache.kafka.common.serialization.StringSerializer
+      acks: all
+      properties:
+        # producer gives up fast when the broker is down so the inline
+        # fallback path kicks in instead of hanging the request
+        max.block.ms: 3000
+        delivery.timeout.ms: 10000
+        request.timeout.ms: 5000
+    listener:
+      missing-topics-fatal: false
+
+  # OAuth2 social login (ported from the auth service). The placeholder
+  # defaults let the application boot without real credentials; set the env
+  # vars to actually use Google/GitHub login.
+  security:
+    oauth2:
+      client:
+        registration:
+
+          google:
+            client-id: ${GOOGLE_CLIENT_ID:google-client-id}
+            client-secret: ${GOOGLE_CLIENT_SECRET:google-client-secret}
+            scope:
+              - email
+              - profile
+              - openid
+
+          github:
+            client-id: ${GITHUB_CLIENT_ID:test-client-id}
+            client-secret: ${GITHUB_CLIENT_SECRET:test-client-secret}
+            scope:
+              - read:user
+              - user:email
+
+# Same secret/issuer defaults the auth service and gateway shared — tokens
+# issued before the merge stay valid.
+security:
+  jwt:
+    secret: ${JWT_SECRET:my-super-secret-key-1234567890123456789012345678901234567890}
+    issuer: ${ISSUER:api.substring.com}
+    access-ttl-seconds: ${JWT_ACCESS_TTL_SECONDS:3600}
+    refresh-ttl-seconds: ${JWT_REFRESH_TTL_SECONDS:86400}
+    refresh-token-cookie-name: ${JWT_REFRESH_COOKIE_NAME:refreshToken}
+    cookie-secure: ${JWT_COOKIE_SECURE:true}
+    cookie-http-only: ${JWT_COOKIE_HTTP_ONLY:true}
+    cookie-same-site: ${JWT_COOKIE_SAME_SITE:lax}
+    cookie-domain: ${JWT_DOMAIN:localhost}
+
+# Kafka clients log every reconnect attempt at INFO — with the broker down
+# that floods the console ("Rebootstrapping with localhost:9092" spam). WARN
+# keeps real problems visible while silencing the retry chatter; the app's
+# own Kafka messages (publish fallback etc.) log under com.xetax and stay.
+logging:
+  level:
+    org.apache.kafka: WARN
+
+# SMTP host is optionally blank (email disabled) — the mail health indicator
+# would mark the whole /actuator/health DOWN for that, so it is excluded.
+management:
+  health:
+    mail:
+      enabled: false
+
+# WhatsApp Business Platform (Meta Cloud API). Every value is env-driven —
+# real credentials live only in .env / environment, never in this file.
+meta:
+  whatsapp:
+    graph-api-version: ${META_GRAPH_API_VERSION:v23.0}
+    graph-base-url: ${META_GRAPH_BASE_URL:https://graph.facebook.com}
+    app-id: ${META_APP_ID:}
+    app-secret: ${META_APP_SECRET:}
+    config-id: ${META_WHATSAPP_CONFIG_ID:}
+    webhook-verify-token: ${WHATSAPP_WEBHOOK_VERIFY_TOKEN:xetax-verify-token}
+    token-encryption-key: ${WHATSAPP_TOKEN_ENCRYPTION_KEY:}
+    default-country-code: ${WHATSAPP_DEFAULT_COUNTRY_CODE:91}
+    sends-per-minute: ${WHATSAPP_SENDS_PER_MINUTE:60}
+    api-connect-timeout-ms: ${META_API_CONNECT_TIMEOUT_MS:5000}
+    api-read-timeout-ms: ${META_API_READ_TIMEOUT_MS:15000}
+    api-max-retries: ${META_API_MAX_RETRIES:2}
+
+# In-app video meetings (WebRTC). public-base-url builds the guest links that
+# get WhatsApp'd / emailed — set APP_PUBLIC_BASE_URL to the real domain in prod.
+app:
+  # Where uploaded documents are stored on disk.
+  upload-dir: ${APP_UPLOAD_DIR:./uploads}
+  # Comma-separated browser origins allowed to call the API (the panel's URL).
+  cors-origins: ${APP_CORS_ORIGINS:http://localhost:5000}
+  public-base-url: ${APP_PUBLIC_BASE_URL:http://localhost:5000}
+  # Backend's own public URL — embed snippets ke liye (widget.js isi se load hota hai)
+  api-base-url: ${APP_API_BASE_URL:http://localhost:8085}
+  # Shared secret for the back-office /api/internal/billing endpoints (plan
+  # activation via curl). Empty = those endpoints are disabled.
+  internal-admin-key: ${INTERNAL_ADMIN_KEY:}
+  meetings:
+    max-participants: ${MEETING_MAX_PARTICIPANTS:5}
+
+# Razorpay — AI top-up checkout only (plan upgrades stay manual for now).
+# Keys: dashboard.razorpay.com -> Account & Settings -> API Keys.
+razorpay:
+  key-id: ${RAZORPAY_KEY_ID:}
+  key-secret: ${RAZORPAY_KEY_SECRET:}

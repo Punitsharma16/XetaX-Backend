@@ -1,0 +1,16 @@
+# Replace the three hostnames with your real DNS records (A → server IP).
+# Caddy gets and renews Let's Encrypt certificates automatically.
+
+# ---- API ----
+api.xetax.in {
+
+    encode gzip
+
+    reverse_proxy app:8085
+
+    header {
+        X-Frame-Options SAMEORIGIN
+        X-Content-Type-Options nosniff
+        Referrer-Policy strict-origin-when-cross-origin
+    }
+}
