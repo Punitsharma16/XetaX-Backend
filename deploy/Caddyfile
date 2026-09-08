@@ -2,7 +2,7 @@
 # Caddy gets and renews Let's Encrypt certificates automatically.
 
 # ---- API ----
-api.xetax.in {
+api.xetacrm.pro {
 
     encode gzip
 
