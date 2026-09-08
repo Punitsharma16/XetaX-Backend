@@ -6,6 +6,14 @@ spring:
     name: crm
 
   ai:
+    # Spring AI chat memory (RediSearch index) — same Redis as spring.data.redis.
+    # Needs Redis Stack (redis/redis-stack-server); plain redis lacks RediSearch
+    # and the app then falls back to in-memory conversation memory.
+    chat:
+      memory:
+        redis:
+          host: ${REDIS_HOST:localhost}
+          port: ${REDIS_PORT:6379}
     openai:
       api-key: ${GROQ_API_KEY:}
       base-url: https://api.groq.com/openai/v1
@@ -66,7 +74,8 @@ spring:
     hibernate:
       ddl-auto: update
 
-    show-sql: true
+    # Verbose locally; compose sets JPA_SHOW_SQL=false so prod logs stay clean.
+    show-sql: ${JPA_SHOW_SQL:true}
 
     properties:
       hibernate:
@@ -77,7 +86,14 @@ spring:
     redis:
       host: ${REDIS_HOST:localhost}
       port: ${REDIS_PORT:6379}
+      # We use Redis as cache/rate-limit store only (RedisTemplate), never as a
+      # repository backend — this stops Spring Data Redis from scanning every
+      # JPA/Mongo repository at boot and logging a "store assignment" line each.
+      repositories:
+        enabled: false
     mongodb:
+      # Never hardcode credentials here — production sets MONGODB_URI via .env /
+      # docker-compose, e.g. mongodb://user:pass@mongo:27017/crm?authSource=admin
       uri: ${MONGODB_URI:mongodb://localhost:27017/crm}
 
   # Kafka — queues WhatsApp campaign sends and webhook delivery reports (DLRs).
@@ -122,6 +138,8 @@ spring:
       client:
         registration:
 
+          # NOTE: an EMPTY GOOGLE_CLIENT_ID env var kills the boot ("must not be
+          # empty") — leave the key out of .env until you have real values.
           google:
             client-id: ${GOOGLE_CLIENT_ID:google-client-id}
             client-secret: ${GOOGLE_CLIENT_SECRET:google-client-secret}
@@ -130,12 +148,6 @@ spring:
               - profile
               - openid
 
-          github:
-            client-id: ${GITHUB_CLIENT_ID:test-client-id}
-            client-secret: ${GITHUB_CLIENT_SECRET:test-client-secret}
-            scope:
-              - read:user
-              - user:email
 
 # Same secret/issuer defaults the auth service and gateway shared — tokens
 # issued before the merge stay valid.

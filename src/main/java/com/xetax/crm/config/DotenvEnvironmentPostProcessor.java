@@ -39,6 +39,13 @@ public class DotenvEnvironmentPostProcessor implements EnvironmentPostProcessor 
     }
 
     private static Path locate() {
+        // Explicit override for servers: DOTENV_PATH=/opt/xetax/.env (any cwd).
+        String explicit = System.getenv("DOTENV_PATH");
+        if (explicit != null && !explicit.isBlank()) {
+            Path p = Paths.get(explicit).toAbsolutePath();
+            if (Files.isRegularFile(p)) return p;
+            System.out.println("[dotenv] DOTENV_PATH set but file not found: " + p);
+        }
         Path dir = Paths.get(System.getProperty("user.dir")).toAbsolutePath();
         for (int i = 0; i < 4 && dir != null; i++) {
             Path candidate = dir.resolve(".env");

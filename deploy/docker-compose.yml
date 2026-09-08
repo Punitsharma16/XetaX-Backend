@@ -36,6 +36,7 @@ services:
 
       APP_UPLOAD_DIR: /app/uploads
       JWT_COOKIE_SECURE: "true"
+      JPA_SHOW_SQL: "false"
 
       # Heap 700m inside a 1100m container: leaves room for metaspace, threads,
       # Mongo/MySQL drivers and the Groq HTTP client — no OOM-kill at peak.
@@ -168,24 +169,18 @@ services:
 
   redis:
 
-    image: redis:7.4-alpine
+    # Redis Stack = Redis + RediSearch/JSON, required by the AI chat-memory index.
+    image: redis/redis-stack-server:7.4.0-v3
 
     restart: unless-stopped
 
-    command:
-      - redis-server
-      - --maxmemory
-      - 128mb
-      - --maxmemory-policy
-      - allkeys-lru
-      - --save
-      - "60"
-      - "1"
+    environment:
+      REDIS_ARGS: "--maxmemory 160mb --maxmemory-policy allkeys-lru --save 60 1"
 
     volumes:
       - ./data/redis:/data
 
-    mem_limit: 150m
+    mem_limit: 260m
 
     healthcheck:
       test: ["CMD","redis-cli","ping"]

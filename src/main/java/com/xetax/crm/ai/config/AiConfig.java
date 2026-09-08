@@ -114,10 +114,17 @@ public class AiConfig {
         return MessageChatMemoryAdvisor.builder(chatMemory).build();
     }
 
+    /**
+     * Jedis client for the AI chat-memory store. Same REDIS_HOST/REDIS_PORT as
+     * spring.data.redis — a hardcoded "localhost" here silently pointed the AI
+     * memory at the wrong box in Docker while everything else used the env.
+     */
     @Bean
-    public RedisClient redisClient() {
+    public RedisClient redisClient(
+            @org.springframework.beans.factory.annotation.Value("${spring.data.redis.host:localhost}") String host,
+            @org.springframework.beans.factory.annotation.Value("${spring.data.redis.port:6379}") int port) {
         return RedisClient.builder()
-                .hostAndPort("localhost", 6379)
+                .hostAndPort(host, port)
                 .build();
     }
 
