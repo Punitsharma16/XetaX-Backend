@@ -1,3 +1,5 @@
 .env
 frontend/
 website/
+# bind-mounted database volumes (mysql/mongo/redis/qdrant) — never commit
+data/
