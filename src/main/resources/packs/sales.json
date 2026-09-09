@@ -53,7 +53,7 @@
   "stages": [
     {
       "name": "New Lead",
-      "code": "new",
+      "code": "NEW",
       "sequence": 1,
       "isDefault": true,
       "isFinal": false,
@@ -62,7 +62,7 @@
     },
     {
       "name": "Contacted",
-      "code": "contacted",
+      "code": "CONTACTED",
       "sequence": 2,
       "isDefault": false,
       "isFinal": false,
@@ -87,7 +87,7 @@
     },
     {
       "name": "Qualified",
-      "code": "qualified",
+      "code": "QUALIFIED",
       "sequence": 3,
       "isDefault": false,
       "isFinal": false,
@@ -96,7 +96,7 @@
     },
     {
       "name": "Proposal",
-      "code": "proposal",
+      "code": "PROPOSAL",
       "sequence": 4,
       "isDefault": false,
       "isFinal": false,
@@ -116,7 +116,7 @@
     },
     {
       "name": "Won",
-      "code": "won",
+      "code": "WON",
       "sequence": 5,
       "isDefault": false,
       "isFinal": true,
@@ -125,7 +125,7 @@
     },
     {
       "name": "Lost",
-      "code": "lost",
+      "code": "LOST",
       "sequence": 6,
       "isDefault": false,
       "isFinal": true,
@@ -149,7 +149,7 @@
     {
       "name": "Won - thank you",
       "trigger": "STAGE_CHANGED",
-      "triggerStageCode": "won",
+      "triggerStageCode": "WON",
       "triggerStatusName": null,
       "actionType": "SEND_WHATSAPP",
       "actionFieldKey": "phone",
@@ -161,7 +161,7 @@
     {
       "name": "Not reachable - follow-up",
       "trigger": "STATUS_CHANGED",
-      "triggerStageCode": "contacted",
+      "triggerStageCode": "CONTACTED",
       "triggerStatusName": "Not reachable",
       "actionType": "SEND_WHATSAPP",
       "actionFieldKey": "phone",
@@ -173,7 +173,7 @@
     {
       "name": "Negotiation nudge",
       "trigger": "STATUS_CHANGED",
-      "triggerStageCode": "proposal",
+      "triggerStageCode": "PROPOSAL",
       "triggerStatusName": "Negotiating",
       "actionType": "SEND_WHATSAPP",
       "actionFieldKey": "phone",
@@ -231,15 +231,15 @@
     "captureFields": true,
     "stageHints": [
       {
-        "stageCode": "contacted",
+        "stageCode": "CONTACTED",
         "hint": "the customer has replied at least once and shared what they need"
       },
       {
-        "stageCode": "qualified",
+        "stageCode": "QUALIFIED",
         "hint": "budget AND timeline are both known and realistic"
       },
       {
-        "stageCode": "lost",
+        "stageCode": "LOST",
         "hint": "the customer clearly says they are not interested any more"
       }
     ]
@@ -261,7 +261,7 @@
         "active": true,
         "afterMinutes": 5,
         "stageCodes": [
-          "new"
+          "NEW"
         ],
         "aiCompose": true,
         "templateName": "welcome_lead",
@@ -277,8 +277,8 @@
         "active": true,
         "afterMinutes": 1440,
         "stageCodes": [
-          "new",
-          "contacted"
+          "NEW",
+          "CONTACTED"
         ],
         "maxRepeats": 3,
         "repeatEveryMinutes": 2880,
@@ -295,8 +295,8 @@
         "action": "SEND_DOCUMENT",
         "active": true,
         "stageCodes": [
-          "contacted",
-          "qualified"
+          "CONTACTED",
+          "QUALIFIED"
         ],
         "aiCompose": true,
         "message": "Hi {name}, based on what you shared, here is our proposal. Happy to adjust anything — when would a quick call suit you?"
@@ -308,7 +308,7 @@
         "active": true,
         "afterMinutes": 4320,
         "stageCodes": [
-          "proposal"
+          "PROPOSAL"
         ],
         "maxRepeats": 2,
         "repeatEveryMinutes": 4320,
@@ -323,7 +323,8 @@
         "interest": "HOT",
         "taskTitle": "Call this hot lead today",
         "taskDueHours": 2,
-        "message": "The AI summary marks this lead HOT. Call now while interest is high."
+        "message": "The AI summary marks this lead HOT. Call now while interest is high.",
+        "stageCodes": []
       },
       {
         "name": "Lead idle 14 days → task",
@@ -332,8 +333,8 @@
         "active": true,
         "afterMinutes": 20160,
         "stageCodes": [
-          "qualified",
-          "proposal"
+          "QUALIFIED",
+          "PROPOSAL"
         ],
         "taskTitle": "Decide: revive or close this lead",
         "taskDueHours": 24,

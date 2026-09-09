@@ -45,7 +45,7 @@
   "stages": [
     {
       "name": "Open",
-      "code": "open",
+      "code": "OPEN",
       "sequence": 1,
       "isDefault": true,
       "isFinal": false,
@@ -54,7 +54,7 @@
     },
     {
       "name": "In Progress",
-      "code": "in_progress",
+      "code": "IN_PROGRESS",
       "sequence": 2,
       "isDefault": false,
       "isFinal": false,
@@ -74,7 +74,7 @@
     },
     {
       "name": "Waiting on Customer",
-      "code": "waiting",
+      "code": "WAITING",
       "sequence": 3,
       "isDefault": false,
       "isFinal": false,
@@ -94,7 +94,7 @@
     },
     {
       "name": "Resolved",
-      "code": "resolved",
+      "code": "RESOLVED",
       "sequence": 4,
       "isDefault": false,
       "isFinal": true,
@@ -118,7 +118,7 @@
     {
       "name": "Resolved message",
       "trigger": "STAGE_CHANGED",
-      "triggerStageCode": "resolved",
+      "triggerStageCode": "RESOLVED",
       "triggerStatusName": null,
       "actionType": "SEND_WHATSAPP",
       "actionFieldKey": "phone",
@@ -130,7 +130,7 @@
     {
       "name": "Escalation update",
       "trigger": "STATUS_CHANGED",
-      "triggerStageCode": "in_progress",
+      "triggerStageCode": "IN_PROGRESS",
       "triggerStatusName": "Escalated",
       "actionType": "SEND_WHATSAPP",
       "actionFieldKey": "phone",
@@ -142,7 +142,7 @@
     {
       "name": "Waiting - customer nudge",
       "trigger": "STATUS_CHANGED",
-      "triggerStageCode": "waiting",
+      "triggerStageCode": "WAITING",
       "triggerStatusName": "No Response",
       "actionType": "SEND_WHATSAPP",
       "actionFieldKey": "phone",
@@ -204,11 +204,11 @@
     "captureFields": true,
     "stageHints": [
       {
-        "stageCode": "in_progress",
+        "stageCode": "IN_PROGRESS",
         "hint": "the issue is understood and being worked on"
       },
       {
-        "stageCode": "resolved",
+        "stageCode": "RESOLVED",
         "hint": "the customer confirms the issue is fixed"
       }
     ]
@@ -230,7 +230,7 @@
         "active": true,
         "afterMinutes": 240,
         "stageCodes": [
-          "open"
+          "OPEN"
         ],
         "taskTitle": "SLA risk: pick up this ticket",
         "taskDueHours": 1,
@@ -243,7 +243,7 @@
         "active": true,
         "afterMinutes": 2880,
         "stageCodes": [
-          "waiting"
+          "WAITING"
         ],
         "maxRepeats": 2,
         "repeatEveryMinutes": 2880,
@@ -257,7 +257,7 @@
         "active": true,
         "afterMinutes": 60,
         "stageCodes": [
-          "resolved"
+          "RESOLVED"
         ],
         "maxRepeats": 1,
         "aiCompose": false,
@@ -271,7 +271,8 @@
         "action": "NOTIFY",
         "active": true,
         "interest": "COLD",
-        "message": "Negative sentiment detected on this ticket — a senior should review."
+        "message": "Negative sentiment detected on this ticket — a senior should review.",
+        "stageCodes": []
       }
     ]
   }

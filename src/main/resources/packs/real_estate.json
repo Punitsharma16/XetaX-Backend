@@ -52,7 +52,7 @@
   "stages": [
     {
       "name": "Enquiry",
-      "code": "enquiry",
+      "code": "ENQUIRY",
       "sequence": 1,
       "isDefault": true,
       "isFinal": false,
@@ -61,7 +61,7 @@
     },
     {
       "name": "Site Visit",
-      "code": "site_visit",
+      "code": "SITE_VISIT",
       "sequence": 2,
       "isDefault": false,
       "isFinal": false,
@@ -86,7 +86,7 @@
     },
     {
       "name": "Negotiation",
-      "code": "negotiation",
+      "code": "NEGOTIATION",
       "sequence": 3,
       "isDefault": false,
       "isFinal": false,
@@ -106,7 +106,7 @@
     },
     {
       "name": "Token / Booking",
-      "code": "booking",
+      "code": "BOOKING",
       "sequence": 4,
       "isDefault": false,
       "isFinal": false,
@@ -115,7 +115,7 @@
     },
     {
       "name": "Registry Done",
-      "code": "registry",
+      "code": "REGISTRY",
       "sequence": 5,
       "isDefault": false,
       "isFinal": true,
@@ -124,7 +124,7 @@
     },
     {
       "name": "Dropped",
-      "code": "dropped",
+      "code": "DROPPED",
       "sequence": 6,
       "isDefault": false,
       "isFinal": true,
@@ -148,7 +148,7 @@
     {
       "name": "Site visit reminder",
       "trigger": "STAGE_CHANGED",
-      "triggerStageCode": "site_visit",
+      "triggerStageCode": "SITE_VISIT",
       "triggerStatusName": null,
       "actionType": "SEND_WHATSAPP",
       "actionFieldKey": "phone",
@@ -160,7 +160,7 @@
     {
       "name": "No show - reschedule",
       "trigger": "STATUS_CHANGED",
-      "triggerStageCode": "site_visit",
+      "triggerStageCode": "SITE_VISIT",
       "triggerStatusName": "No Show",
       "actionType": "SEND_WHATSAPP",
       "actionFieldKey": "phone",
@@ -172,7 +172,7 @@
     {
       "name": "Visit feedback",
       "trigger": "STATUS_CHANGED",
-      "triggerStageCode": "site_visit",
+      "triggerStageCode": "SITE_VISIT",
       "triggerStatusName": "Visited",
       "actionType": "SEND_WHATSAPP",
       "actionFieldKey": "phone",
@@ -231,19 +231,19 @@
     "captureFields": true,
     "stageHints": [
       {
-        "stageCode": "site_visit",
+        "stageCode": "SITE_VISIT",
         "hint": "a site visit date or time is agreed"
       },
       {
-        "stageCode": "negotiation",
+        "stageCode": "NEGOTIATION",
         "hint": "the buyer asks about final price, discount or payment plan"
       },
       {
-        "stageCode": "booking",
+        "stageCode": "BOOKING",
         "hint": "the buyer confirms a token or booking amount"
       },
       {
-        "stageCode": "dropped",
+        "stageCode": "DROPPED",
         "hint": "the buyer says they bought elsewhere or are no longer looking"
       }
     ]
@@ -266,7 +266,7 @@
         "active": true,
         "afterMinutes": 3,
         "stageCodes": [
-          "enquiry"
+          "ENQUIRY"
         ],
         "aiCompose": true,
         "templateName": "property_enquiry_welcome",
@@ -282,8 +282,8 @@
         "active": true,
         "afterMinutes": 1440,
         "stageCodes": [
-          "enquiry",
-          "site_visit"
+          "ENQUIRY",
+          "SITE_VISIT"
         ],
         "maxRepeats": 3,
         "repeatEveryMinutes": 2880,
@@ -300,9 +300,9 @@
         "action": "SEND_DOCUMENT",
         "active": true,
         "stageCodes": [
-          "enquiry",
-          "site_visit",
-          "negotiation"
+          "ENQUIRY",
+          "SITE_VISIT",
+          "NEGOTIATION"
         ],
         "aiCompose": true,
         "message": "Hi {client_name}, here is the brochure for projects in your budget and location. When can you come for a site visit?"
@@ -315,7 +315,8 @@
         "interest": "HOT",
         "taskTitle": "Call this buyer and fix a site visit",
         "taskDueHours": 2,
-        "message": "AI marks this buyer HOT — call and lock a visit slot."
+        "message": "AI marks this buyer HOT — call and lock a visit slot.",
+        "stageCodes": []
       },
       {
         "name": "Stuck 10 days → task",
@@ -324,9 +325,9 @@
         "active": true,
         "afterMinutes": 14400,
         "stageCodes": [
-          "site_visit",
-          "negotiation",
-          "booking"
+          "SITE_VISIT",
+          "NEGOTIATION",
+          "BOOKING"
         ],
         "taskTitle": "Revive this buyer (new listing / offer)",
         "taskDueHours": 24,

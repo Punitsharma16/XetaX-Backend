@@ -72,7 +72,7 @@
   "stages": [
     {
       "name": "New Request",
-      "code": "new",
+      "code": "NEW",
       "sequence": 1,
       "isDefault": true,
       "isFinal": false,
@@ -80,7 +80,7 @@
     },
     {
       "name": "Visit Scheduled",
-      "code": "scheduled",
+      "code": "SCHEDULED",
       "sequence": 2,
       "isDefault": false,
       "isFinal": false,
@@ -88,7 +88,7 @@
     },
     {
       "name": "In Progress",
-      "code": "in_progress",
+      "code": "IN_PROGRESS",
       "sequence": 3,
       "isDefault": false,
       "isFinal": false,
@@ -96,7 +96,7 @@
     },
     {
       "name": "Payment Pending",
-      "code": "payment",
+      "code": "PAYMENT",
       "sequence": 4,
       "isDefault": false,
       "isFinal": false,
@@ -104,7 +104,7 @@
     },
     {
       "name": "Completed",
-      "code": "completed",
+      "code": "COMPLETED",
       "sequence": 5,
       "isDefault": false,
       "isFinal": true,
@@ -112,7 +112,7 @@
     },
     {
       "name": "Cancelled",
-      "code": "cancelled",
+      "code": "CANCELLED",
       "sequence": 6,
       "isDefault": false,
       "isFinal": true,
@@ -131,7 +131,7 @@
     {
       "name": "Visit scheduled message",
       "trigger": "STAGE_CHANGED",
-      "triggerStageCode": "scheduled",
+      "triggerStageCode": "SCHEDULED",
       "actionType": "SEND_WHATSAPP",
       "actionFieldKey": "phone",
       "emailMessage": "Your technician visit is scheduled for {visit_slot}. Technician: {technician}. Reply here to reschedule.",
@@ -140,7 +140,7 @@
     {
       "name": "Payment reminder",
       "trigger": "STAGE_CHANGED",
-      "triggerStageCode": "payment",
+      "triggerStageCode": "PAYMENT",
       "actionType": "SEND_WHATSAPP",
       "actionFieldKey": "phone",
       "emailMessage": "Service done! Amount due: ₹{estimate}. You can pay via UPI or cash to the technician. Thank you!",
@@ -191,11 +191,11 @@
     "captureFields": true,
     "stageHints": [
       {
-        "stageCode": "scheduled",
+        "stageCode": "SCHEDULED",
         "hint": "a visit date/slot is agreed"
       },
       {
-        "stageCode": "cancelled",
+        "stageCode": "CANCELLED",
         "hint": "the customer cancels the request"
       }
     ]
@@ -217,7 +217,7 @@
         "active": true,
         "afterMinutes": 120,
         "stageCodes": [
-          "new"
+          "NEW"
         ],
         "maxRepeats": 2,
         "repeatEveryMinutes": 1440,
@@ -236,7 +236,7 @@
         "active": true,
         "afterMinutes": 2880,
         "stageCodes": [
-          "payment"
+          "PAYMENT"
         ],
         "maxRepeats": 2,
         "repeatEveryMinutes": 2880,
@@ -250,7 +250,7 @@
         "active": true,
         "afterMinutes": 10080,
         "stageCodes": [
-          "payment"
+          "PAYMENT"
         ],
         "taskTitle": "Collect pending payment",
         "taskDueHours": 24,
@@ -264,7 +264,8 @@
         "interest": "COLD",
         "taskTitle": "Call unhappy customer",
         "taskDueHours": 2,
-        "message": "Negative sentiment in the last conversation."
+        "message": "Negative sentiment in the last conversation.",
+        "stageCodes": []
       }
     ]
   }

@@ -109,8 +109,7 @@ public class StageServiceImpl implements StageService {
         FormStage stage = stageRepo.findById(id).orElseThrow(() -> new ResourceNotFoundException("Stage Not Found"));
         ownershipGuard.requireOwnedForm(stage.getFormId());
 
-        if (!stage.getCode().equals(request.getCode()) && stageRepo.existsByFormIdAndCode(stage.getFormId(),
-                request.getCode())) {
+        if (stageRepo.existsByFormIdAndCodeAndIdNot(stage.getFormId(), request.getCode(), stage.getId())) {
             throw new BadRequestException("Stage code already exists");
         }
 

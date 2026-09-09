@@ -52,7 +52,7 @@
   "stages": [
     {
       "name": "Registered",
-      "code": "registered",
+      "code": "REGISTERED",
       "sequence": 1,
       "isDefault": true,
       "isFinal": false,
@@ -61,7 +61,7 @@
     },
     {
       "name": "Waiting",
-      "code": "waiting",
+      "code": "WAITING",
       "sequence": 2,
       "isDefault": false,
       "isFinal": false,
@@ -81,7 +81,7 @@
     },
     {
       "name": "In Consultation",
-      "code": "consultation",
+      "code": "CONSULTATION",
       "sequence": 3,
       "isDefault": false,
       "isFinal": false,
@@ -90,7 +90,7 @@
     },
     {
       "name": "Tests / Lab",
-      "code": "tests",
+      "code": "TESTS",
       "sequence": 4,
       "isDefault": false,
       "isFinal": false,
@@ -110,7 +110,7 @@
     },
     {
       "name": "Discharged",
-      "code": "discharged",
+      "code": "DISCHARGED",
       "sequence": 5,
       "isDefault": false,
       "isFinal": true,
@@ -134,7 +134,7 @@
     {
       "name": "Lab instructions",
       "trigger": "STAGE_CHANGED",
-      "triggerStageCode": "tests",
+      "triggerStageCode": "TESTS",
       "triggerStatusName": null,
       "actionType": "SEND_WHATSAPP",
       "actionFieldKey": "phone",
@@ -146,7 +146,7 @@
     {
       "name": "Report ready",
       "trigger": "STATUS_CHANGED",
-      "triggerStageCode": "tests",
+      "triggerStageCode": "TESTS",
       "triggerStatusName": "Report Ready",
       "actionType": "SEND_WHATSAPP",
       "actionFieldKey": "phone",
@@ -206,11 +206,11 @@
     "captureFields": true,
     "stageHints": [
       {
-        "stageCode": "waiting",
+        "stageCode": "WAITING",
         "hint": "an appointment date and time are agreed"
       },
       {
-        "stageCode": "consultation",
+        "stageCode": "CONSULTATION",
         "hint": "the patient says the doctor consultation is done"
       }
     ]
@@ -232,7 +232,7 @@
         "active": true,
         "afterMinutes": 180,
         "stageCodes": [
-          "registered"
+          "REGISTERED"
         ],
         "maxRepeats": 2,
         "repeatEveryMinutes": 1440,
@@ -251,7 +251,7 @@
         "active": true,
         "afterMinutes": 60,
         "stageCodes": [
-          "waiting"
+          "WAITING"
         ],
         "maxRepeats": 1,
         "aiCompose": false,
@@ -269,7 +269,7 @@
         "active": true,
         "afterMinutes": 4320,
         "stageCodes": [
-          "discharged"
+          "DISCHARGED"
         ],
         "maxRepeats": 1,
         "aiCompose": true,
@@ -287,7 +287,8 @@
         "interest": "HOT",
         "taskTitle": "Patient needs a call from staff",
         "taskDueHours": 1,
-        "message": "AI flagged this conversation as urgent/high intent — call the patient."
+        "message": "AI flagged this conversation as urgent/high intent — call the patient.",
+        "stageCodes": []
       }
     ]
   }

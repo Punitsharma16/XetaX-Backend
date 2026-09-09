@@ -74,7 +74,7 @@
   "stages": [
     {
       "name": "New Enquiry",
-      "code": "new",
+      "code": "NEW",
       "sequence": 1,
       "isDefault": true,
       "isFinal": false,
@@ -82,7 +82,7 @@
     },
     {
       "name": "Counselled",
-      "code": "counselled",
+      "code": "COUNSELLED",
       "sequence": 2,
       "isDefault": false,
       "isFinal": false,
@@ -90,7 +90,7 @@
     },
     {
       "name": "Demo Booked",
-      "code": "demo",
+      "code": "DEMO",
       "sequence": 3,
       "isDefault": false,
       "isFinal": false,
@@ -98,7 +98,7 @@
     },
     {
       "name": "Fee Discussion",
-      "code": "fee",
+      "code": "FEE",
       "sequence": 4,
       "isDefault": false,
       "isFinal": false,
@@ -106,7 +106,7 @@
     },
     {
       "name": "Admitted",
-      "code": "admitted",
+      "code": "ADMITTED",
       "sequence": 5,
       "isDefault": false,
       "isFinal": true,
@@ -114,7 +114,7 @@
     },
     {
       "name": "Dropped",
-      "code": "dropped",
+      "code": "DROPPED",
       "sequence": 6,
       "isDefault": false,
       "isFinal": true,
@@ -133,7 +133,7 @@
     {
       "name": "Demo booked confirmation",
       "trigger": "STAGE_CHANGED",
-      "triggerStageCode": "demo",
+      "triggerStageCode": "DEMO",
       "actionType": "SEND_WHATSAPP",
       "actionFieldKey": "phone",
       "emailMessage": "Demo class confirmed for {student_name} on {demo_date}. Batch: {batch}. See you there!",
@@ -142,7 +142,7 @@
     {
       "name": "Admission task for counsellor",
       "trigger": "STAGE_CHANGED",
-      "triggerStageCode": "admitted",
+      "triggerStageCode": "ADMITTED",
       "actionType": "CREATE_TASK",
       "actionValue": "Collect documents & fee receipt — {student_name}",
       "emailMessage": "Course: {course}, Fee: {fee}",
@@ -194,15 +194,15 @@
     "captureFields": true,
     "stageHints": [
       {
-        "stageCode": "counselled",
+        "stageCode": "COUNSELLED",
         "hint": "the course and batch preference are known"
       },
       {
-        "stageCode": "demo",
+        "stageCode": "DEMO",
         "hint": "a demo class date is agreed"
       },
       {
-        "stageCode": "dropped",
+        "stageCode": "DROPPED",
         "hint": "they say they joined elsewhere or are not interested"
       }
     ]
@@ -224,7 +224,7 @@
         "active": true,
         "afterMinutes": 5,
         "stageCodes": [
-          "new"
+          "NEW"
         ],
         "aiCompose": true,
         "templateName": "admission_enquiry_welcome",
@@ -241,8 +241,8 @@
         "active": true,
         "afterMinutes": 1440,
         "stageCodes": [
-          "new",
-          "counselled"
+          "NEW",
+          "COUNSELLED"
         ],
         "maxRepeats": 3,
         "repeatEveryMinutes": 2880,
@@ -260,8 +260,8 @@
         "action": "SEND_DOCUMENT",
         "active": true,
         "stageCodes": [
-          "new",
-          "counselled"
+          "NEW",
+          "COUNSELLED"
         ],
         "aiCompose": true,
         "message": "Here is the course brochure with batch timings and fees. Which batch works — morning, evening or weekend?"
@@ -273,7 +273,7 @@
         "active": true,
         "afterMinutes": 2880,
         "stageCodes": [
-          "demo"
+          "DEMO"
         ],
         "maxRepeats": 2,
         "repeatEveryMinutes": 2880,
@@ -288,7 +288,8 @@
         "interest": "HOT",
         "taskTitle": "Call this family today — ready to admit",
         "taskDueHours": 2,
-        "message": "AI marks this enquiry HOT."
+        "message": "AI marks this enquiry HOT.",
+        "stageCodes": []
       },
       {
         "name": "Fee discussion stuck 7 days",
@@ -297,7 +298,7 @@
         "active": true,
         "afterMinutes": 10080,
         "stageCodes": [
-          "fee"
+          "FEE"
         ],
         "taskTitle": "Close or drop: fee discussion pending",
         "taskDueHours": 24,

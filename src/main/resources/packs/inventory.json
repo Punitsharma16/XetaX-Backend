@@ -52,7 +52,7 @@
   "stages": [
     {
       "name": "Requested",
-      "code": "requested",
+      "code": "REQUESTED",
       "sequence": 1,
       "isDefault": true,
       "isFinal": false,
@@ -61,7 +61,7 @@
     },
     {
       "name": "Approved",
-      "code": "approved",
+      "code": "APPROVED",
       "sequence": 2,
       "isDefault": false,
       "isFinal": false,
@@ -70,7 +70,7 @@
     },
     {
       "name": "Ordered",
-      "code": "ordered",
+      "code": "ORDERED",
       "sequence": 3,
       "isDefault": false,
       "isFinal": false,
@@ -95,7 +95,7 @@
     },
     {
       "name": "Received",
-      "code": "received",
+      "code": "RECEIVED",
       "sequence": 4,
       "isDefault": false,
       "isFinal": false,
@@ -104,7 +104,7 @@
     },
     {
       "name": "Stocked",
-      "code": "stocked",
+      "code": "STOCKED",
       "sequence": 5,
       "isDefault": false,
       "isFinal": true,
@@ -113,7 +113,7 @@
     },
     {
       "name": "Rejected",
-      "code": "rejected",
+      "code": "REJECTED",
       "sequence": 6,
       "isDefault": false,
       "isFinal": true,
@@ -125,7 +125,7 @@
     {
       "name": "PO email to supplier",
       "trigger": "STAGE_CHANGED",
-      "triggerStageCode": "ordered",
+      "triggerStageCode": "ORDERED",
       "triggerStatusName": null,
       "actionType": "SEND_EMAIL",
       "actionFieldKey": "supplier_email",
@@ -137,7 +137,7 @@
     {
       "name": "Stock update on receive",
       "trigger": "STAGE_CHANGED",
-      "triggerStageCode": "received",
+      "triggerStageCode": "RECEIVED",
       "triggerStatusName": null,
       "actionType": "ADJUST_FIELD",
       "actionFieldKey": "current_stock",
@@ -149,7 +149,7 @@
     {
       "name": "Supplier delay reminder",
       "trigger": "STATUS_CHANGED",
-      "triggerStageCode": "ordered",
+      "triggerStageCode": "ORDERED",
       "triggerStatusName": "Delayed",
       "actionType": "SEND_EMAIL",
       "actionFieldKey": "supplier_email",
@@ -207,7 +207,7 @@
         "active": true,
         "afterMinutes": 2880,
         "stageCodes": [
-          "requested"
+          "REQUESTED"
         ],
         "taskTitle": "Approve or reject this purchase request",
         "taskDueHours": 24,
@@ -220,7 +220,7 @@
         "active": true,
         "afterMinutes": 10080,
         "stageCodes": [
-          "ordered"
+          "ORDERED"
         ],
         "maxRepeats": 2,
         "repeatEveryMinutes": 4320,

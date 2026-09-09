@@ -52,7 +52,7 @@
   "stages": [
     {
       "name": "Placed",
-      "code": "placed",
+      "code": "PLACED",
       "sequence": 1,
       "isDefault": true,
       "isFinal": false,
@@ -61,7 +61,7 @@
     },
     {
       "name": "Confirmed",
-      "code": "confirmed",
+      "code": "CONFIRMED",
       "sequence": 2,
       "isDefault": false,
       "isFinal": false,
@@ -70,7 +70,7 @@
     },
     {
       "name": "Preparing",
-      "code": "preparing",
+      "code": "PREPARING",
       "sequence": 3,
       "isDefault": false,
       "isFinal": false,
@@ -90,7 +90,7 @@
     },
     {
       "name": "Ready",
-      "code": "ready",
+      "code": "READY",
       "sequence": 4,
       "isDefault": false,
       "isFinal": false,
@@ -110,7 +110,7 @@
     },
     {
       "name": "Completed",
-      "code": "completed",
+      "code": "COMPLETED",
       "sequence": 5,
       "isDefault": false,
       "isFinal": true,
@@ -119,7 +119,7 @@
     },
     {
       "name": "Cancelled",
-      "code": "cancelled",
+      "code": "CANCELLED",
       "sequence": 6,
       "isDefault": false,
       "isFinal": true,
@@ -143,7 +143,7 @@
     {
       "name": "Order ready",
       "trigger": "STAGE_CHANGED",
-      "triggerStageCode": "ready",
+      "triggerStageCode": "READY",
       "triggerStatusName": null,
       "actionType": "SEND_WHATSAPP",
       "actionFieldKey": "phone",
@@ -155,7 +155,7 @@
     {
       "name": "Order delayed - sorry",
       "trigger": "STATUS_CHANGED",
-      "triggerStageCode": "preparing",
+      "triggerStageCode": "PREPARING",
       "triggerStatusName": "Delayed",
       "actionType": "SEND_WHATSAPP",
       "actionFieldKey": "phone",
@@ -167,7 +167,7 @@
     {
       "name": "Out for delivery",
       "trigger": "STATUS_CHANGED",
-      "triggerStageCode": "ready",
+      "triggerStageCode": "READY",
       "triggerStatusName": "Out for Delivery",
       "actionType": "SEND_WHATSAPP",
       "actionFieldKey": "phone",
@@ -226,15 +226,15 @@
     "captureFields": true,
     "stageHints": [
       {
-        "stageCode": "confirmed",
+        "stageCode": "CONFIRMED",
         "hint": "the customer confirms the items and address/time"
       },
       {
-        "stageCode": "preparing",
+        "stageCode": "PREPARING",
         "hint": "the customer confirms the items and address/time"
       },
       {
-        "stageCode": "cancelled",
+        "stageCode": "CANCELLED",
         "hint": "the customer cancels the order"
       }
     ]
@@ -256,7 +256,7 @@
         "active": true,
         "afterMinutes": 10,
         "stageCodes": [
-          "placed"
+          "PLACED"
         ],
         "maxRepeats": 1,
         "aiCompose": true,
@@ -269,7 +269,7 @@
         "active": true,
         "afterMinutes": 120,
         "stageCodes": [
-          "completed"
+          "COMPLETED"
         ],
         "maxRepeats": 1,
         "aiCompose": false,
@@ -287,7 +287,8 @@
         "interest": "COLD",
         "taskTitle": "Unhappy customer — call back",
         "taskDueHours": 1,
-        "message": "AI sentiment is negative. A manager should call this customer."
+        "message": "AI sentiment is negative. A manager should call this customer.",
+        "stageCodes": []
       }
     ]
   }
