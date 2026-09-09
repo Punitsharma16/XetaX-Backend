@@ -13,6 +13,8 @@ public interface WhatsAppConversationRepository extends JpaRepository<WhatsAppCo
 
     Optional<WhatsAppConversation> findByIdAndOwnerUserId(Long id, String ownerUserId);
 
+    Optional<WhatsAppConversation> findFirstByOwnerUserIdAndRecordIdOrderByIdDesc(String ownerUserId, String recordId);
+
     Page<WhatsAppConversation> findByOwnerUserIdOrderByLastMessageAtDesc(String ownerUserId, Pageable pageable);
 
     long countByOwnerUserIdAndUnreadCountGreaterThan(String ownerUserId, int unread);

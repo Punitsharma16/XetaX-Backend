@@ -12,5 +12,7 @@ public interface WhatsAppTemplateRepository extends JpaRepository<WhatsAppTempla
 
     Optional<WhatsAppTemplate> findByWhatsappConfigIdAndNameAndLanguage(Long configId, String name, String language);
 
+    Optional<WhatsAppTemplate> findFirstByOwnerUserIdAndNameAndStatus(String ownerUserId, String name, String status);
+
     void deleteByWhatsappConfigId(Long configId);
 }

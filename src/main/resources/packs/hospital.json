@@ -1,0 +1,294 @@
+{
+  "key": "hospital",
+  "name": "Hospital / Clinic (OPD)",
+  "icon": "bi-heart-pulse",
+  "color": "#dc2626",
+  "tagline": "Patient registration se discharge tak",
+  "description": "Patients register karo, appointments track karo, aur har step par unhe update rakho.",
+  "fields": [
+    {
+      "label": "Patient Name",
+      "fieldKey": "patient_name",
+      "fieldType": "TEXT",
+      "required": true,
+      "optionsJson": null
+    },
+    {
+      "label": "Phone",
+      "fieldKey": "phone",
+      "fieldType": "PHONE",
+      "required": true,
+      "optionsJson": null
+    },
+    {
+      "label": "Age",
+      "fieldKey": "age",
+      "fieldType": "NUMBER",
+      "required": false,
+      "optionsJson": null
+    },
+    {
+      "label": "Department",
+      "fieldKey": "department",
+      "fieldType": "SELECT",
+      "required": false,
+      "optionsJson": "[\"General\",\"Ortho\",\"Cardio\",\"Pediatrics\",\"ENT\"]"
+    },
+    {
+      "label": "Doctor",
+      "fieldKey": "doctor",
+      "fieldType": "TEXT",
+      "required": false,
+      "optionsJson": null
+    },
+    {
+      "label": "Appointment Date",
+      "fieldKey": "appointment_date",
+      "fieldType": "DATE",
+      "required": false,
+      "optionsJson": null
+    }
+  ],
+  "stages": [
+    {
+      "name": "Registered",
+      "code": "registered",
+      "sequence": 1,
+      "isDefault": true,
+      "isFinal": false,
+      "color": "#6366f1",
+      "statuses": []
+    },
+    {
+      "name": "Waiting",
+      "code": "waiting",
+      "sequence": 2,
+      "isDefault": false,
+      "isFinal": false,
+      "color": "#f59e0b",
+      "statuses": [
+        {
+          "name": "In Queue",
+          "color": "#f59e0b",
+          "isDefault": true
+        },
+        {
+          "name": "Called In",
+          "color": "#0ea5e9",
+          "isDefault": false
+        }
+      ]
+    },
+    {
+      "name": "In Consultation",
+      "code": "consultation",
+      "sequence": 3,
+      "isDefault": false,
+      "isFinal": false,
+      "color": "#0ea5e9",
+      "statuses": []
+    },
+    {
+      "name": "Tests / Lab",
+      "code": "tests",
+      "sequence": 4,
+      "isDefault": false,
+      "isFinal": false,
+      "color": "#a855f7",
+      "statuses": [
+        {
+          "name": "Sample Taken",
+          "color": "#a855f7",
+          "isDefault": true
+        },
+        {
+          "name": "Report Ready",
+          "color": "#22c55e",
+          "isDefault": false
+        }
+      ]
+    },
+    {
+      "name": "Discharged",
+      "code": "discharged",
+      "sequence": 5,
+      "isDefault": false,
+      "isFinal": true,
+      "color": "#22c55e",
+      "statuses": []
+    }
+  ],
+  "automations": [
+    {
+      "name": "Registration confirm",
+      "trigger": "RECORD_CREATED",
+      "triggerStageCode": null,
+      "triggerStatusName": null,
+      "actionType": "SEND_WHATSAPP",
+      "actionFieldKey": "phone",
+      "actionValue": null,
+      "emailSubject": null,
+      "emailMessage": "{patient_name} ji, aapka registration ho gaya hai. Appointment: {appointment_date}.",
+      "note": "Register hote hi patient ko confirmation"
+    },
+    {
+      "name": "Lab instructions",
+      "trigger": "STAGE_CHANGED",
+      "triggerStageCode": "tests",
+      "triggerStatusName": null,
+      "actionType": "SEND_WHATSAPP",
+      "actionFieldKey": "phone",
+      "actionValue": null,
+      "emailSubject": null,
+      "emailMessage": "{patient_name} ji, lab test ke liye pahunchein. Reports ready hone par batayenge.",
+      "note": "Tests stage par instructions"
+    },
+    {
+      "name": "Report ready",
+      "trigger": "STATUS_CHANGED",
+      "triggerStageCode": "tests",
+      "triggerStatusName": "Report Ready",
+      "actionType": "SEND_WHATSAPP",
+      "actionFieldKey": "phone",
+      "actionValue": null,
+      "emailSubject": null,
+      "emailMessage": "{patient_name} ji, aapki report ready hai — collect kar sakte hain ya doctor se milein.",
+      "note": "Status 'Report Ready' hote hi patient ko khabar"
+    }
+  ],
+  "industry": "Healthcare / Clinic",
+  "tags": [
+    "clinic",
+    "appointment",
+    "OPD"
+  ],
+  "language": "hinglish",
+  "whatsappTemplates": [
+    {
+      "name": "appointment_confirmation",
+      "purpose": "Confirm a booked appointment",
+      "category": "UTILITY",
+      "language": "en",
+      "bodyText": "Hi {{1}}, your appointment is confirmed for {{2}}. Please arrive 10 minutes early and carry previous reports if any.",
+      "exampleParams": [
+        "Neha",
+        "Mon 10:30 AM"
+      ]
+    },
+    {
+      "name": "appointment_reminder",
+      "purpose": "Reminder before the visit",
+      "category": "UTILITY",
+      "language": "en",
+      "bodyText": "Hi {{1}}, reminder for your appointment on {{2}}. Reply YES to confirm or RESCHEDULE to pick another slot.",
+      "exampleParams": [
+        "Neha",
+        "tomorrow 10:30 AM"
+      ]
+    },
+    {
+      "name": "followup_checkin",
+      "purpose": "Post-visit check-in",
+      "category": "UTILITY",
+      "language": "en",
+      "bodyText": "Hi {{1}}, hope you're feeling better after your visit. If you'd like a follow-up consultation, reply here and we'll book a slot.",
+      "exampleParams": [
+        "Neha"
+      ]
+    }
+  ],
+  "agent": {
+    "name": "Clinic Assistant",
+    "persona": "You are a polite clinic front-desk assistant. Help patients book or reschedule appointments, share timings, doctors and services from the knowledge, and collect name, phone and the reason for the visit. Never give medical advice — for symptoms, suggest booking a consultation or hand off to staff.",
+    "welcomeMessage": "Hello! I can help you book an appointment or answer questions about our clinic.",
+    "handoffKeywords": "emergency, urgent, doctor now, human, staff",
+    "pipelineMode": "SUGGEST",
+    "captureFields": true,
+    "stageHints": [
+      {
+        "stageCode": "waiting",
+        "hint": "an appointment date and time are agreed"
+      },
+      {
+        "stageCode": "consultation",
+        "hint": "the patient says the doctor consultation is done"
+      }
+    ]
+  },
+  "playbook": {
+    "goal": "Turn every enquiry into a booked appointment, reduce no-shows with reminders, and bring patients back for follow-ups.",
+    "qualificationKeys": [
+      "phone",
+      "department"
+    ],
+    "quietStart": 21,
+    "quietEnd": 8,
+    "maxFollowUps": 3,
+    "rules": [
+      {
+        "name": "Enquiry without booking",
+        "trigger": "NO_REPLY",
+        "action": "SEND_MESSAGE",
+        "active": true,
+        "afterMinutes": 180,
+        "stageCodes": [
+          "registered"
+        ],
+        "maxRepeats": 2,
+        "repeatEveryMinutes": 1440,
+        "aiCompose": true,
+        "templateName": "appointment_reminder",
+        "message": "Hi {patient_name}, would you like me to book your appointment in {department}? Share a preferred day and time.",
+        "templateParams": [
+          "patient_name",
+          "appointment_date"
+        ]
+      },
+      {
+        "name": "Reminder for scheduled visits",
+        "trigger": "STAGE_IDLE",
+        "action": "SEND_MESSAGE",
+        "active": true,
+        "afterMinutes": 60,
+        "stageCodes": [
+          "waiting"
+        ],
+        "maxRepeats": 1,
+        "aiCompose": false,
+        "templateName": "appointment_reminder",
+        "message": "Hi {patient_name}, reminder for your appointment on {appointment_date}. Reply YES to confirm or RESCHEDULE to change the slot.",
+        "templateParams": [
+          "patient_name",
+          "appointment_date"
+        ]
+      },
+      {
+        "name": "Post-visit follow-up",
+        "trigger": "STAGE_IDLE",
+        "action": "SEND_MESSAGE",
+        "active": true,
+        "afterMinutes": 4320,
+        "stageCodes": [
+          "discharged"
+        ],
+        "maxRepeats": 1,
+        "aiCompose": true,
+        "message": "Hope you're feeling better after your visit. Want a follow-up consultation? Reply and we'll book it.",
+        "templateName": "followup_checkin",
+        "templateParams": [
+          "patient_name"
+        ]
+      },
+      {
+        "name": "Urgent case → staff",
+        "trigger": "INTEREST",
+        "action": "HANDOFF",
+        "active": true,
+        "interest": "HOT",
+        "taskTitle": "Patient needs a call from staff",
+        "taskDueHours": 1,
+        "message": "AI flagged this conversation as urgent/high intent — call the patient."
+      }
+    ]
+  }
+}

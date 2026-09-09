@@ -1,0 +1,308 @@
+{
+  "key": "coaching",
+  "name": "Coaching / Education",
+  "icon": "bi-mortarboard",
+  "color": "#0d9488",
+  "industry": "Education",
+  "tags": [
+    "admissions",
+    "batches",
+    "fees"
+  ],
+  "language": "hinglish",
+  "tagline": "Enquiry se admission tak, fee reminder ke saath",
+  "description": "Coaching institutes, schools aur online courses ke liye: admission enquiries, demo class, batch allotment aur fee follow-up ek jagah.",
+  "fields": [
+    {
+      "label": "Student Name",
+      "fieldKey": "student_name",
+      "fieldType": "TEXT",
+      "required": true
+    },
+    {
+      "label": "Parent / Contact Phone",
+      "fieldKey": "phone",
+      "fieldType": "PHONE",
+      "required": true
+    },
+    {
+      "label": "Email",
+      "fieldKey": "email",
+      "fieldType": "EMAIL",
+      "required": false
+    },
+    {
+      "label": "Course",
+      "fieldKey": "course",
+      "fieldType": "SELECT",
+      "required": false,
+      "optionsJson": "[\"Class 9-10\",\"Class 11-12\",\"JEE\",\"NEET\",\"Spoken English\",\"Computer\",\"Other\"]"
+    },
+    {
+      "label": "Preferred Batch",
+      "fieldKey": "batch",
+      "fieldType": "SELECT",
+      "required": false,
+      "optionsJson": "[\"Morning\",\"Evening\",\"Weekend\",\"Online\"]"
+    },
+    {
+      "label": "Demo Class Date",
+      "fieldKey": "demo_date",
+      "fieldType": "DATE",
+      "required": false
+    },
+    {
+      "label": "Fee Quoted",
+      "fieldKey": "fee",
+      "fieldType": "NUMBER",
+      "required": false
+    },
+    {
+      "label": "Source",
+      "fieldKey": "source",
+      "fieldType": "SELECT",
+      "required": false,
+      "optionsJson": "[\"Website\",\"WhatsApp\",\"Walk-in\",\"Referral\",\"Instagram\"]"
+    },
+    {
+      "label": "Notes",
+      "fieldKey": "notes",
+      "fieldType": "TEXTAREA",
+      "required": false
+    }
+  ],
+  "stages": [
+    {
+      "name": "New Enquiry",
+      "code": "new",
+      "sequence": 1,
+      "isDefault": true,
+      "isFinal": false,
+      "color": "#6366f1"
+    },
+    {
+      "name": "Counselled",
+      "code": "counselled",
+      "sequence": 2,
+      "isDefault": false,
+      "isFinal": false,
+      "color": "#0ea5e9"
+    },
+    {
+      "name": "Demo Booked",
+      "code": "demo",
+      "sequence": 3,
+      "isDefault": false,
+      "isFinal": false,
+      "color": "#f59e0b"
+    },
+    {
+      "name": "Fee Discussion",
+      "code": "fee",
+      "sequence": 4,
+      "isDefault": false,
+      "isFinal": false,
+      "color": "#a855f7"
+    },
+    {
+      "name": "Admitted",
+      "code": "admitted",
+      "sequence": 5,
+      "isDefault": false,
+      "isFinal": true,
+      "color": "#22c55e"
+    },
+    {
+      "name": "Dropped",
+      "code": "dropped",
+      "sequence": 6,
+      "isDefault": false,
+      "isFinal": true,
+      "color": "#ef4444"
+    }
+  ],
+  "automations": [
+    {
+      "name": "Welcome on enquiry",
+      "trigger": "RECORD_CREATED",
+      "actionType": "SEND_WHATSAPP",
+      "actionFieldKey": "phone",
+      "emailMessage": "Hi {student_name}'s family! Thanks for enquiring about {course}. Our counsellor will call you shortly — or reply here with a good time.",
+      "note": "Pehla message turant — trust banta hai"
+    },
+    {
+      "name": "Demo booked confirmation",
+      "trigger": "STAGE_CHANGED",
+      "triggerStageCode": "demo",
+      "actionType": "SEND_WHATSAPP",
+      "actionFieldKey": "phone",
+      "emailMessage": "Demo class confirmed for {student_name} on {demo_date}. Batch: {batch}. See you there!",
+      "note": "Demo stage par confirmation"
+    },
+    {
+      "name": "Admission task for counsellor",
+      "trigger": "STAGE_CHANGED",
+      "triggerStageCode": "admitted",
+      "actionType": "CREATE_TASK",
+      "actionValue": "Collect documents & fee receipt — {student_name}",
+      "emailMessage": "Course: {course}, Fee: {fee}",
+      "emailSubject": "48",
+      "note": "Admission ke baad paperwork ka task"
+    }
+  ],
+  "whatsappTemplates": [
+    {
+      "name": "admission_enquiry_welcome",
+      "purpose": "First reply to an admission enquiry",
+      "category": "UTILITY",
+      "language": "en",
+      "bodyText": "Hi {{1}}, thanks for your interest in {{2}}! Our counsellor will guide you. When is a good time to talk, or would you like a free demo class?",
+      "exampleParams": [
+        "Rohan",
+        "JEE batch"
+      ]
+    },
+    {
+      "name": "demo_class_reminder",
+      "purpose": "Reminder before the demo class",
+      "category": "UTILITY",
+      "language": "en",
+      "bodyText": "Hi {{1}}, reminder: the demo class is on {{2}}. Reply YES to confirm. Bring a notebook!",
+      "exampleParams": [
+        "Rohan",
+        "Saturday 10 AM"
+      ]
+    },
+    {
+      "name": "fee_followup",
+      "purpose": "Fee follow-up after demo",
+      "category": "UTILITY",
+      "language": "en",
+      "bodyText": "Hi {{1}}, hope the demo class was useful. Seats in the {{2}} batch are limited — shall I reserve one? Reply YES for the fee details.",
+      "exampleParams": [
+        "Rohan",
+        "Evening"
+      ]
+    }
+  ],
+  "agent": {
+    "name": "Admission Counsellor",
+    "persona": "You are a warm admission counsellor. Learn the student's class/course, preferred batch and the parent's phone, explain courses, timings and fees ONLY from the knowledge, and push for a free demo class — that is where admissions happen.",
+    "welcomeMessage": "Hi! Looking for the right course or batch? Tell me the class/exam and I'll guide you.",
+    "handoffKeywords": "discount, scholarship, principal, human, call me",
+    "pipelineMode": "SUGGEST",
+    "captureFields": true,
+    "stageHints": [
+      {
+        "stageCode": "counselled",
+        "hint": "the course and batch preference are known"
+      },
+      {
+        "stageCode": "demo",
+        "hint": "a demo class date is agreed"
+      },
+      {
+        "stageCode": "dropped",
+        "hint": "they say they joined elsewhere or are not interested"
+      }
+    ]
+  },
+  "playbook": {
+    "goal": "Book a free demo class, then close the admission. Every message should end with a demo slot or a fee next-step.",
+    "qualificationKeys": [
+      "phone",
+      "course"
+    ],
+    "quietStart": 21,
+    "quietEnd": 9,
+    "maxFollowUps": 4,
+    "rules": [
+      {
+        "name": "Welcome new enquiry",
+        "trigger": "RECORD_CREATED",
+        "action": "SEND_MESSAGE",
+        "active": true,
+        "afterMinutes": 5,
+        "stageCodes": [
+          "new"
+        ],
+        "aiCompose": true,
+        "templateName": "admission_enquiry_welcome",
+        "message": "Hi, thanks for your interest in {course}! Would you like a free demo class this week?",
+        "templateParams": [
+          "student_name",
+          "course"
+        ]
+      },
+      {
+        "name": "Follow up silent enquiries",
+        "trigger": "NO_REPLY",
+        "action": "SEND_MESSAGE",
+        "active": true,
+        "afterMinutes": 1440,
+        "stageCodes": [
+          "new",
+          "counselled"
+        ],
+        "maxRepeats": 3,
+        "repeatEveryMinutes": 2880,
+        "aiCompose": true,
+        "templateName": "fee_followup",
+        "message": "Hi, still deciding on {course}? A free demo class is the best way to see our teaching — shall I book one?",
+        "templateParams": [
+          "student_name",
+          "batch"
+        ]
+      },
+      {
+        "name": "Qualified → course brochure",
+        "trigger": "QUALIFIED",
+        "action": "SEND_DOCUMENT",
+        "active": true,
+        "stageCodes": [
+          "new",
+          "counselled"
+        ],
+        "aiCompose": true,
+        "message": "Here is the course brochure with batch timings and fees. Which batch works — morning, evening or weekend?"
+      },
+      {
+        "name": "Demo done, no fee talk in 2 days",
+        "trigger": "STAGE_IDLE",
+        "action": "SEND_MESSAGE",
+        "active": true,
+        "afterMinutes": 2880,
+        "stageCodes": [
+          "demo"
+        ],
+        "maxRepeats": 2,
+        "repeatEveryMinutes": 2880,
+        "aiCompose": true,
+        "message": "Hope the demo class was useful! Seats are limited — shall I reserve one for {student_name}?"
+      },
+      {
+        "name": "Hot enquiry → counsellor call",
+        "trigger": "INTEREST",
+        "action": "HANDOFF",
+        "active": true,
+        "interest": "HOT",
+        "taskTitle": "Call this family today — ready to admit",
+        "taskDueHours": 2,
+        "message": "AI marks this enquiry HOT."
+      },
+      {
+        "name": "Fee discussion stuck 7 days",
+        "trigger": "STAGE_IDLE",
+        "action": "CREATE_TASK",
+        "active": true,
+        "afterMinutes": 10080,
+        "stageCodes": [
+          "fee"
+        ],
+        "taskTitle": "Close or drop: fee discussion pending",
+        "taskDueHours": 24,
+        "message": "Fee discussion pending for a week."
+      }
+    ]
+  }
+}

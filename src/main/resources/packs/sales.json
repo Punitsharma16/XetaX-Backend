@@ -1,0 +1,344 @@
+{
+  "key": "sales",
+  "name": "Sales Pipeline",
+  "icon": "bi-graph-up-arrow",
+  "color": "#4f46e5",
+  "tagline": "Leads se deals tak — kuch bhi na chhoote",
+  "description": "Naye leads capture karo, follow-up karo, aur har deal ko Won tak track karo.",
+  "fields": [
+    {
+      "label": "Name",
+      "fieldKey": "name",
+      "fieldType": "TEXT",
+      "required": true,
+      "optionsJson": null,
+      "placeholder": "Full name"
+    },
+    {
+      "label": "Phone",
+      "fieldKey": "phone",
+      "fieldType": "PHONE",
+      "required": true,
+      "optionsJson": null
+    },
+    {
+      "label": "Email",
+      "fieldKey": "email",
+      "fieldType": "EMAIL",
+      "required": false,
+      "optionsJson": null
+    },
+    {
+      "label": "Budget",
+      "fieldKey": "budget",
+      "fieldType": "NUMBER",
+      "required": false,
+      "optionsJson": null
+    },
+    {
+      "label": "Source",
+      "fieldKey": "source",
+      "fieldType": "SELECT",
+      "required": false,
+      "optionsJson": "[\"Website\",\"WhatsApp\",\"Referral\",\"Walk-in\"]"
+    },
+    {
+      "label": "Notes",
+      "fieldKey": "notes",
+      "fieldType": "TEXTAREA",
+      "required": false,
+      "optionsJson": null
+    }
+  ],
+  "stages": [
+    {
+      "name": "New Lead",
+      "code": "new",
+      "sequence": 1,
+      "isDefault": true,
+      "isFinal": false,
+      "color": "#6366f1",
+      "statuses": []
+    },
+    {
+      "name": "Contacted",
+      "code": "contacted",
+      "sequence": 2,
+      "isDefault": false,
+      "isFinal": false,
+      "color": "#0ea5e9",
+      "statuses": [
+        {
+          "name": "Ringing",
+          "color": "#0ea5e9",
+          "isDefault": true
+        },
+        {
+          "name": "Call back",
+          "color": "#f59e0b",
+          "isDefault": false
+        },
+        {
+          "name": "Not reachable",
+          "color": "#ef4444",
+          "isDefault": false
+        }
+      ]
+    },
+    {
+      "name": "Qualified",
+      "code": "qualified",
+      "sequence": 3,
+      "isDefault": false,
+      "isFinal": false,
+      "color": "#f59e0b",
+      "statuses": []
+    },
+    {
+      "name": "Proposal",
+      "code": "proposal",
+      "sequence": 4,
+      "isDefault": false,
+      "isFinal": false,
+      "color": "#a855f7",
+      "statuses": [
+        {
+          "name": "Sent",
+          "color": "#a855f7",
+          "isDefault": true
+        },
+        {
+          "name": "Negotiating",
+          "color": "#f59e0b",
+          "isDefault": false
+        }
+      ]
+    },
+    {
+      "name": "Won",
+      "code": "won",
+      "sequence": 5,
+      "isDefault": false,
+      "isFinal": true,
+      "color": "#22c55e",
+      "statuses": []
+    },
+    {
+      "name": "Lost",
+      "code": "lost",
+      "sequence": 6,
+      "isDefault": false,
+      "isFinal": true,
+      "color": "#ef4444",
+      "statuses": []
+    }
+  ],
+  "automations": [
+    {
+      "name": "Welcome message",
+      "trigger": "RECORD_CREATED",
+      "triggerStageCode": null,
+      "triggerStatusName": null,
+      "actionType": "SEND_WHATSAPP",
+      "actionFieldKey": "phone",
+      "actionValue": null,
+      "emailSubject": null,
+      "emailMessage": "Hi {name}! Aapki enquiry mil gayi hai — hamari team jald contact karegi.",
+      "note": "Naya lead aate hi WhatsApp welcome"
+    },
+    {
+      "name": "Won - thank you",
+      "trigger": "STAGE_CHANGED",
+      "triggerStageCode": "won",
+      "triggerStatusName": null,
+      "actionType": "SEND_WHATSAPP",
+      "actionFieldKey": "phone",
+      "actionValue": null,
+      "emailSubject": null,
+      "emailMessage": "Congratulations {name}! Aapka order confirm ho gaya. Dhanyavaad!",
+      "note": "Deal Won hote hi thank-you message"
+    },
+    {
+      "name": "Not reachable - follow-up",
+      "trigger": "STATUS_CHANGED",
+      "triggerStageCode": "contacted",
+      "triggerStatusName": "Not reachable",
+      "actionType": "SEND_WHATSAPP",
+      "actionFieldKey": "phone",
+      "actionValue": null,
+      "emailSubject": null,
+      "emailMessage": "{name} ji, humne aapse sampark karne ki koshish ki. Jab free hon, reply kar dein — hum turant call karenge.",
+      "note": "Status 'Not reachable' hote hi customer ko soft nudge"
+    },
+    {
+      "name": "Negotiation nudge",
+      "trigger": "STATUS_CHANGED",
+      "triggerStageCode": "proposal",
+      "triggerStatusName": "Negotiating",
+      "actionType": "SEND_WHATSAPP",
+      "actionFieldKey": "phone",
+      "actionValue": null,
+      "emailSubject": null,
+      "emailMessage": "{name} ji, proposal par koi sawaal ho to batayein — best price ke liye hum taiyar hain!",
+      "note": "Status 'Negotiating' par deal aage badhane wala message"
+    }
+  ],
+  "industry": "Sales / B2B",
+  "tags": [
+    "sales",
+    "leads",
+    "pipeline"
+  ],
+  "language": "hinglish",
+  "whatsappTemplates": [
+    {
+      "name": "welcome_lead",
+      "purpose": "First touch after enquiry",
+      "category": "UTILITY",
+      "language": "en",
+      "bodyText": "Hi {{1}}, thanks for reaching out to us! I'm from the sales team. What are you looking for and what's your budget? Reply here and I'll help right away.",
+      "exampleParams": [
+        "Rahul"
+      ]
+    },
+    {
+      "name": "followup_no_reply",
+      "purpose": "Follow-up when the lead goes quiet",
+      "category": "UTILITY",
+      "language": "en",
+      "bodyText": "Hi {{1}}, just checking in on your enquiry. Do you still need help, or should I share a quick proposal? Reply YES and I'll send it.",
+      "exampleParams": [
+        "Rahul"
+      ]
+    },
+    {
+      "name": "proposal_sent",
+      "purpose": "After a proposal / quotation is shared",
+      "category": "UTILITY",
+      "language": "en",
+      "bodyText": "Hi {{1}}, your proposal is ready and attached here. Let me know if you'd like changes or a quick call to walk through it.",
+      "exampleParams": [
+        "Rahul"
+      ]
+    }
+  ],
+  "agent": {
+    "name": "Sales Assistant",
+    "persona": "You are a friendly, sharp sales assistant for this business. Qualify the lead (need, budget, timeline), answer product questions from the knowledge, and always propose the next step: a call, a demo or a proposal. Be brief and warm.",
+    "welcomeMessage": "Hi! Tell me what you're looking for and I'll help you find the right option.",
+    "handoffKeywords": "human, call me, manager, complaint",
+    "pipelineMode": "SUGGEST",
+    "captureFields": true,
+    "stageHints": [
+      {
+        "stageCode": "contacted",
+        "hint": "the customer has replied at least once and shared what they need"
+      },
+      {
+        "stageCode": "qualified",
+        "hint": "budget AND timeline are both known and realistic"
+      },
+      {
+        "stageCode": "lost",
+        "hint": "the customer clearly says they are not interested any more"
+      }
+    ]
+  },
+  "playbook": {
+    "goal": "Book a discovery call or send a proposal, then get a YES. Every message should move the lead one step closer.",
+    "qualificationKeys": [
+      "phone",
+      "budget"
+    ],
+    "quietStart": 21,
+    "quietEnd": 9,
+    "maxFollowUps": 3,
+    "rules": [
+      {
+        "name": "Welcome new lead",
+        "trigger": "RECORD_CREATED",
+        "action": "SEND_MESSAGE",
+        "active": true,
+        "afterMinutes": 5,
+        "stageCodes": [
+          "new"
+        ],
+        "aiCompose": true,
+        "templateName": "welcome_lead",
+        "message": "Hi {name}, thanks for reaching out! What are you looking for and what's your budget? I'll help right away.",
+        "templateParams": [
+          "name"
+        ]
+      },
+      {
+        "name": "Follow up silent leads",
+        "trigger": "NO_REPLY",
+        "action": "SEND_MESSAGE",
+        "active": true,
+        "afterMinutes": 1440,
+        "stageCodes": [
+          "new",
+          "contacted"
+        ],
+        "maxRepeats": 3,
+        "repeatEveryMinutes": 2880,
+        "aiCompose": true,
+        "templateName": "followup_no_reply",
+        "message": "Hi {name}, just checking in on your enquiry. Do you still need help, or should I share a quick proposal?",
+        "templateParams": [
+          "name"
+        ]
+      },
+      {
+        "name": "Qualified → send proposal",
+        "trigger": "QUALIFIED",
+        "action": "SEND_DOCUMENT",
+        "active": true,
+        "stageCodes": [
+          "contacted",
+          "qualified"
+        ],
+        "aiCompose": true,
+        "message": "Hi {name}, based on what you shared, here is our proposal. Happy to adjust anything — when would a quick call suit you?"
+      },
+      {
+        "name": "Proposal stuck 3 days",
+        "trigger": "STAGE_IDLE",
+        "action": "SEND_MESSAGE",
+        "active": true,
+        "afterMinutes": 4320,
+        "stageCodes": [
+          "proposal"
+        ],
+        "maxRepeats": 2,
+        "repeatEveryMinutes": 4320,
+        "aiCompose": true,
+        "message": "Hi {name}, did you get a chance to look at the proposal? Any questions I can answer?"
+      },
+      {
+        "name": "Hot lead → alert the team",
+        "trigger": "INTEREST",
+        "action": "HANDOFF",
+        "active": true,
+        "interest": "HOT",
+        "taskTitle": "Call this hot lead today",
+        "taskDueHours": 2,
+        "message": "The AI summary marks this lead HOT. Call now while interest is high."
+      },
+      {
+        "name": "Lead idle 14 days → task",
+        "trigger": "STAGE_IDLE",
+        "action": "CREATE_TASK",
+        "active": true,
+        "afterMinutes": 20160,
+        "stageCodes": [
+          "qualified",
+          "proposal"
+        ],
+        "taskTitle": "Decide: revive or close this lead",
+        "taskDueHours": 24,
+        "message": "No movement in 2 weeks. Revive with an offer or mark as Lost."
+      }
+    ]
+  }
+}

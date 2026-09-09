@@ -131,6 +131,15 @@ public class ChannelConfigService {
         return toMap(configRepository.save(cfg));
     }
 
+    /** Configs of this workspace whose conversations land in the given form (pack export uses it). */
+    public List<AgentChannelConfig> configsTargeting(String ownerUserId, Long formId) {
+        List<AgentChannelConfig> out = new ArrayList<>();
+        for (AgentChannelConfig c : configRepository.findByOwnerUserId(ownerUserId)) {
+            if (formId.equals(c.getTargetFormId())) out.add(c);
+        }
+        return out;
+    }
+
     public void deleteFor(Long agentId) {
         configRepository.deleteByAgentId(agentId);
     }

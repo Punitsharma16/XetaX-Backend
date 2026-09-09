@@ -1,0 +1,278 @@
+{
+  "key": "support",
+  "name": "Customer Support Tickets",
+  "icon": "bi-headset",
+  "color": "#7c3aed",
+  "tagline": "Har complaint ka hisaab, har customer khush",
+  "description": "Tickets capture karo, priority par kaam karo, aur resolve hote hi customer ko batao.",
+  "fields": [
+    {
+      "label": "Customer Name",
+      "fieldKey": "customer_name",
+      "fieldType": "TEXT",
+      "required": true,
+      "optionsJson": null
+    },
+    {
+      "label": "Phone",
+      "fieldKey": "phone",
+      "fieldType": "PHONE",
+      "required": true,
+      "optionsJson": null
+    },
+    {
+      "label": "Email",
+      "fieldKey": "email",
+      "fieldType": "EMAIL",
+      "required": false,
+      "optionsJson": null
+    },
+    {
+      "label": "Issue",
+      "fieldKey": "issue",
+      "fieldType": "TEXTAREA",
+      "required": true,
+      "optionsJson": null
+    },
+    {
+      "label": "Priority",
+      "fieldKey": "priority",
+      "fieldType": "SELECT",
+      "required": false,
+      "optionsJson": "[\"Low\",\"Medium\",\"High\",\"Urgent\"]"
+    }
+  ],
+  "stages": [
+    {
+      "name": "Open",
+      "code": "open",
+      "sequence": 1,
+      "isDefault": true,
+      "isFinal": false,
+      "color": "#6366f1",
+      "statuses": []
+    },
+    {
+      "name": "In Progress",
+      "code": "in_progress",
+      "sequence": 2,
+      "isDefault": false,
+      "isFinal": false,
+      "color": "#f59e0b",
+      "statuses": [
+        {
+          "name": "Being Worked",
+          "color": "#f59e0b",
+          "isDefault": true
+        },
+        {
+          "name": "Escalated",
+          "color": "#ef4444",
+          "isDefault": false
+        }
+      ]
+    },
+    {
+      "name": "Waiting on Customer",
+      "code": "waiting",
+      "sequence": 3,
+      "isDefault": false,
+      "isFinal": false,
+      "color": "#0ea5e9",
+      "statuses": [
+        {
+          "name": "Info Needed",
+          "color": "#0ea5e9",
+          "isDefault": true
+        },
+        {
+          "name": "No Response",
+          "color": "#ef4444",
+          "isDefault": false
+        }
+      ]
+    },
+    {
+      "name": "Resolved",
+      "code": "resolved",
+      "sequence": 4,
+      "isDefault": false,
+      "isFinal": true,
+      "color": "#22c55e",
+      "statuses": []
+    }
+  ],
+  "automations": [
+    {
+      "name": "Ticket confirmation",
+      "trigger": "RECORD_CREATED",
+      "triggerStageCode": null,
+      "triggerStatusName": null,
+      "actionType": "SEND_WHATSAPP",
+      "actionFieldKey": "phone",
+      "actionValue": null,
+      "emailSubject": null,
+      "emailMessage": "{customer_name} ji, aapki complaint register ho gayi hai. Team jald sampark karegi.",
+      "note": "Ticket bante hi confirmation"
+    },
+    {
+      "name": "Resolved message",
+      "trigger": "STAGE_CHANGED",
+      "triggerStageCode": "resolved",
+      "triggerStatusName": null,
+      "actionType": "SEND_WHATSAPP",
+      "actionFieldKey": "phone",
+      "actionValue": null,
+      "emailSubject": null,
+      "emailMessage": "{customer_name} ji, aapka issue resolve ho gaya hai. Dhanyavaad!",
+      "note": "Resolve hote hi customer ko khabar"
+    },
+    {
+      "name": "Escalation update",
+      "trigger": "STATUS_CHANGED",
+      "triggerStageCode": "in_progress",
+      "triggerStatusName": "Escalated",
+      "actionType": "SEND_WHATSAPP",
+      "actionFieldKey": "phone",
+      "actionValue": null,
+      "emailSubject": null,
+      "emailMessage": "{customer_name} ji, aapka issue hamari senior team dekh rahi hai — jald update denge.",
+      "note": "Status 'Escalated' par customer ko bharosa"
+    },
+    {
+      "name": "Waiting - customer nudge",
+      "trigger": "STATUS_CHANGED",
+      "triggerStageCode": "waiting",
+      "triggerStatusName": "No Response",
+      "actionType": "SEND_WHATSAPP",
+      "actionFieldKey": "phone",
+      "actionValue": null,
+      "emailSubject": null,
+      "emailMessage": "{customer_name} ji, aapke jawab ka intezar hai — reply milte hi hum aage badhenge.",
+      "note": "Status 'No Response' par yaad dilana"
+    }
+  ],
+  "industry": "Customer support",
+  "tags": [
+    "tickets",
+    "helpdesk",
+    "SLA"
+  ],
+  "language": "en",
+  "whatsappTemplates": [
+    {
+      "name": "ticket_received",
+      "purpose": "Acknowledge a new ticket",
+      "category": "UTILITY",
+      "language": "en",
+      "bodyText": "Hi {{1}}, we've received your request (ticket {{2}}). Our team is on it and will update you shortly.",
+      "exampleParams": [
+        "Karan",
+        "#1042"
+      ]
+    },
+    {
+      "name": "ticket_update",
+      "purpose": "Progress update",
+      "category": "UTILITY",
+      "language": "en",
+      "bodyText": "Hi {{1}}, update on your ticket {{2}}: {{3}}. Reply here if you have questions.",
+      "exampleParams": [
+        "Karan",
+        "#1042",
+        "the replacement has been shipped"
+      ]
+    },
+    {
+      "name": "ticket_resolved",
+      "purpose": "Closing a ticket",
+      "category": "UTILITY",
+      "language": "en",
+      "bodyText": "Hi {{1}}, your ticket {{2}} is resolved. Was this helpful? Reply 1-5 to rate our support.",
+      "exampleParams": [
+        "Karan",
+        "#1042"
+      ]
+    }
+  ],
+  "agent": {
+    "name": "Support Assistant",
+    "persona": "You are a calm, precise support assistant. Resolve common questions from the knowledge base step by step, collect the details a ticket needs (name, phone/email, product, issue), and hand off to a person when the customer is upset or the issue is not covered.",
+    "welcomeMessage": "Hi, I'm here to help. Describe the issue and I'll sort it out or get the right person.",
+    "handoffKeywords": "refund, cancel, legal, escalate, human, agent",
+    "pipelineMode": "SUGGEST",
+    "captureFields": true,
+    "stageHints": [
+      {
+        "stageCode": "in_progress",
+        "hint": "the issue is understood and being worked on"
+      },
+      {
+        "stageCode": "resolved",
+        "hint": "the customer confirms the issue is fixed"
+      }
+    ]
+  },
+  "playbook": {
+    "goal": "Resolve every ticket quickly, keep the customer updated, and close with a satisfaction rating.",
+    "qualificationKeys": [
+      "phone",
+      "issue"
+    ],
+    "quietStart": 22,
+    "quietEnd": 8,
+    "maxFollowUps": 3,
+    "rules": [
+      {
+        "name": "Ticket untouched 4 hours → escalate",
+        "trigger": "STAGE_IDLE",
+        "action": "HANDOFF",
+        "active": true,
+        "afterMinutes": 240,
+        "stageCodes": [
+          "open"
+        ],
+        "taskTitle": "SLA risk: pick up this ticket",
+        "taskDueHours": 1,
+        "message": "Nobody has touched this ticket for 4 hours."
+      },
+      {
+        "name": "Waiting on customer 2 days",
+        "trigger": "NO_REPLY",
+        "action": "SEND_MESSAGE",
+        "active": true,
+        "afterMinutes": 2880,
+        "stageCodes": [
+          "waiting"
+        ],
+        "maxRepeats": 2,
+        "repeatEveryMinutes": 2880,
+        "aiCompose": true,
+        "message": "Hi {customer_name}, we're waiting for your reply to continue on your ticket. Is the issue still there?"
+      },
+      {
+        "name": "Resolved → rating",
+        "trigger": "STAGE_IDLE",
+        "action": "SEND_MESSAGE",
+        "active": true,
+        "afterMinutes": 60,
+        "stageCodes": [
+          "resolved"
+        ],
+        "maxRepeats": 1,
+        "aiCompose": false,
+        "templateName": null,
+        "message": "Your ticket is resolved. Was this helpful? Reply 1-5 to rate our support.",
+        "templateParams": []
+      },
+      {
+        "name": "Angry customer → manager",
+        "trigger": "INTEREST",
+        "action": "NOTIFY",
+        "active": true,
+        "interest": "COLD",
+        "message": "Negative sentiment detected on this ticket — a senior should review."
+      }
+    ]
+  }
+}

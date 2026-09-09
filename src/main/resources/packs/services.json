@@ -1,0 +1,271 @@
+{
+  "key": "services",
+  "name": "Home & Field Services",
+  "icon": "bi-tools",
+  "color": "#b45309",
+  "industry": "Services",
+  "tags": [
+    "AMC",
+    "repair",
+    "service call"
+  ],
+  "language": "hinglish",
+  "tagline": "Complaint se service visit aur AMC renewal tak",
+  "description": "AC / appliance repair, pest control, cleaning, plumbing, solar — service requests, technician visits, payment aur AMC renewal reminders.",
+  "fields": [
+    {
+      "label": "Customer Name",
+      "fieldKey": "customer_name",
+      "fieldType": "TEXT",
+      "required": true
+    },
+    {
+      "label": "Phone",
+      "fieldKey": "phone",
+      "fieldType": "PHONE",
+      "required": true
+    },
+    {
+      "label": "Address",
+      "fieldKey": "address",
+      "fieldType": "TEXTAREA",
+      "required": false
+    },
+    {
+      "label": "Service Type",
+      "fieldKey": "service_type",
+      "fieldType": "SELECT",
+      "required": false,
+      "optionsJson": "[\"Repair\",\"Installation\",\"AMC Visit\",\"Cleaning\",\"Inspection\",\"Other\"]"
+    },
+    {
+      "label": "Preferred Visit Slot",
+      "fieldKey": "visit_slot",
+      "fieldType": "TEXT",
+      "required": false
+    },
+    {
+      "label": "Technician",
+      "fieldKey": "technician",
+      "fieldType": "TEXT",
+      "required": false
+    },
+    {
+      "label": "Estimate (₹)",
+      "fieldKey": "estimate",
+      "fieldType": "NUMBER",
+      "required": false
+    },
+    {
+      "label": "AMC Expiry",
+      "fieldKey": "amc_expiry",
+      "fieldType": "DATE",
+      "required": false
+    },
+    {
+      "label": "Notes",
+      "fieldKey": "notes",
+      "fieldType": "TEXTAREA",
+      "required": false
+    }
+  ],
+  "stages": [
+    {
+      "name": "New Request",
+      "code": "new",
+      "sequence": 1,
+      "isDefault": true,
+      "isFinal": false,
+      "color": "#6366f1"
+    },
+    {
+      "name": "Visit Scheduled",
+      "code": "scheduled",
+      "sequence": 2,
+      "isDefault": false,
+      "isFinal": false,
+      "color": "#0ea5e9"
+    },
+    {
+      "name": "In Progress",
+      "code": "in_progress",
+      "sequence": 3,
+      "isDefault": false,
+      "isFinal": false,
+      "color": "#f59e0b"
+    },
+    {
+      "name": "Payment Pending",
+      "code": "payment",
+      "sequence": 4,
+      "isDefault": false,
+      "isFinal": false,
+      "color": "#a855f7"
+    },
+    {
+      "name": "Completed",
+      "code": "completed",
+      "sequence": 5,
+      "isDefault": false,
+      "isFinal": true,
+      "color": "#22c55e"
+    },
+    {
+      "name": "Cancelled",
+      "code": "cancelled",
+      "sequence": 6,
+      "isDefault": false,
+      "isFinal": true,
+      "color": "#ef4444"
+    }
+  ],
+  "automations": [
+    {
+      "name": "Request received",
+      "trigger": "RECORD_CREATED",
+      "actionType": "SEND_WHATSAPP",
+      "actionFieldKey": "phone",
+      "emailMessage": "Hi {customer_name}, we've received your {service_type} request. We'll confirm the technician visit slot shortly.",
+      "note": "Turant acknowledgement"
+    },
+    {
+      "name": "Visit scheduled message",
+      "trigger": "STAGE_CHANGED",
+      "triggerStageCode": "scheduled",
+      "actionType": "SEND_WHATSAPP",
+      "actionFieldKey": "phone",
+      "emailMessage": "Your technician visit is scheduled for {visit_slot}. Technician: {technician}. Reply here to reschedule.",
+      "note": "Visit confirm"
+    },
+    {
+      "name": "Payment reminder",
+      "trigger": "STAGE_CHANGED",
+      "triggerStageCode": "payment",
+      "actionType": "SEND_WHATSAPP",
+      "actionFieldKey": "phone",
+      "emailMessage": "Service done! Amount due: ₹{estimate}. You can pay via UPI or cash to the technician. Thank you!",
+      "note": "Payment stage par reminder"
+    }
+  ],
+  "whatsappTemplates": [
+    {
+      "name": "service_request_received",
+      "purpose": "Acknowledge a service request",
+      "category": "UTILITY",
+      "language": "en",
+      "bodyText": "Hi {{1}}, we've received your {{2}} request. We'll confirm the technician visit shortly. Reply with a preferred time slot.",
+      "exampleParams": [
+        "Sunil",
+        "AC repair"
+      ]
+    },
+    {
+      "name": "visit_reminder",
+      "purpose": "Reminder before the technician visit",
+      "category": "UTILITY",
+      "language": "en",
+      "bodyText": "Hi {{1}}, reminder: our technician will visit on {{2}}. Please keep the area accessible. Reply YES to confirm.",
+      "exampleParams": [
+        "Sunil",
+        "today 3-5 PM"
+      ]
+    },
+    {
+      "name": "amc_renewal",
+      "purpose": "AMC renewal reminder",
+      "category": "MARKETING",
+      "language": "en",
+      "bodyText": "Hi {{1}}, your AMC expires on {{2}}. Renew now to keep priority service and free visits. Reply RENEW and we'll take care of it.",
+      "exampleParams": [
+        "Sunil",
+        "30 Sept"
+      ]
+    }
+  ],
+  "agent": {
+    "name": "Service Desk",
+    "persona": "You are a helpful service-desk assistant. Understand the problem, collect name, phone, address and a preferred visit slot, quote ONLY the visiting charges listed in the knowledge, and confirm the visit. For urgent breakdowns hand off to staff.",
+    "welcomeMessage": "Hi! Tell me what needs fixing and your area — I'll book a technician visit.",
+    "handoffKeywords": "urgent, emergency, complaint, refund, human",
+    "pipelineMode": "SUGGEST",
+    "captureFields": true,
+    "stageHints": [
+      {
+        "stageCode": "scheduled",
+        "hint": "a visit date/slot is agreed"
+      },
+      {
+        "stageCode": "cancelled",
+        "hint": "the customer cancels the request"
+      }
+    ]
+  },
+  "playbook": {
+    "goal": "Book the technician visit fast, collect payment after the job, and renew every AMC before it expires.",
+    "qualificationKeys": [
+      "phone",
+      "address"
+    ],
+    "quietStart": 21,
+    "quietEnd": 8,
+    "maxFollowUps": 3,
+    "rules": [
+      {
+        "name": "Request not scheduled in 2 hours",
+        "trigger": "STAGE_IDLE",
+        "action": "SEND_MESSAGE",
+        "active": true,
+        "afterMinutes": 120,
+        "stageCodes": [
+          "new"
+        ],
+        "maxRepeats": 2,
+        "repeatEveryMinutes": 1440,
+        "aiCompose": true,
+        "templateName": "service_request_received",
+        "message": "Hi {customer_name}, which time slot works for the technician visit — morning or evening?",
+        "templateParams": [
+          "customer_name",
+          "service_type"
+        ]
+      },
+      {
+        "name": "Payment pending 2 days",
+        "trigger": "STAGE_IDLE",
+        "action": "SEND_MESSAGE",
+        "active": true,
+        "afterMinutes": 2880,
+        "stageCodes": [
+          "payment"
+        ],
+        "maxRepeats": 2,
+        "repeatEveryMinutes": 2880,
+        "aiCompose": true,
+        "message": "Hi {customer_name}, a gentle reminder — ₹{estimate} is pending for the recent service. Pay via UPI or reply if there's an issue."
+      },
+      {
+        "name": "Payment pending 7 days → task",
+        "trigger": "STAGE_IDLE",
+        "action": "CREATE_TASK",
+        "active": true,
+        "afterMinutes": 10080,
+        "stageCodes": [
+          "payment"
+        ],
+        "taskTitle": "Collect pending payment",
+        "taskDueHours": 24,
+        "message": "₹{estimate} pending for a week."
+      },
+      {
+        "name": "Unhappy customer → manager",
+        "trigger": "INTEREST",
+        "action": "HANDOFF",
+        "active": true,
+        "interest": "COLD",
+        "taskTitle": "Call unhappy customer",
+        "taskDueHours": 2,
+        "message": "Negative sentiment in the last conversation."
+      }
+    ]
+  }
+}

@@ -207,6 +207,49 @@ public class WhatsAppMessagingService {
         dispatchAsync(message.getId(), null);
     }
 
+    /** Connected config of a workspace, if any (no security context needed). */
+    public java.util.Optional<WhatsAppConfig> connectedConfig(String ownerUserId) {
+        return configRepository.findFirstByOwnerUserIdOrderByIdDesc(ownerUserId)
+                .filter(c -> c.getStatus() == WhatsAppConnectionStatus.CONNECTED);
+    }
+
+    /** True when a free-text message can reach this phone right now (connected + 24h window). */
+    public boolean canTextAsOwner(String ownerUserId, String rawPhone) {
+        WhatsAppConfig config = connectedConfig(ownerUserId).orElse(null);
+        if (config == null) return false;
+        String phone = phoneNumberService.normalize(rawPhone).orElse(null);
+        return phone != null && isWindowOpen(config.getId(), phone);
+    }
+
+    /**
+     * Playbook / automation path for cold sends: an APPROVED template with
+     * positional body parameters. Returns false when WhatsApp is not
+     * connected or the template is not approved — callers fall back.
+     */
+    public boolean sendTemplateAsOwner(String ownerUserId, String rawPhone, String templateName,
+                                       String language, java.util.List<String> bodyParams, String recordId) {
+        WhatsAppConfig config = connectedConfig(ownerUserId).orElse(null);
+        if (config == null || templateName == null || templateName.isBlank()) return false;
+        String phone = phoneNumberService.normalize(rawPhone).orElse(null);
+        if (phone == null) return false;
+        String lang = language == null || language.isBlank() ? "en" : language;
+        String componentsJson = null;
+        if (bodyParams != null && !bodyParams.isEmpty()) {
+            java.util.List<java.util.Map<String, Object>> parameters = new java.util.ArrayList<>();
+            for (String v : bodyParams) parameters.add(java.util.Map.of("type", "text", "text", v == null ? "" : v));
+            try {
+                componentsJson = new com.fasterxml.jackson.databind.ObjectMapper().writeValueAsString(
+                        java.util.List.of(java.util.Map.of("type", "body", "parameters", parameters)));
+            } catch (Exception e) {
+                return false;
+            }
+        }
+        WhatsAppMessage message = queueOutbound(config, phone, WhatsAppMessageType.TEMPLATE,
+                "[template] " + templateName, templateName, lang, componentsJson, recordId, null);
+        dispatchAsync(message.getId(), componentsJson);
+        return true;
+    }
+
     /** Document/image send scoped by owner — Documents module & automations use it. */
     public void sendDocumentAsOwner(String ownerUserId, String rawPhone, byte[] bytes,
                                     String filename, String contentType, String caption) {

@@ -1,0 +1,234 @@
+{
+  "key": "inventory",
+  "name": "Inventory / Procurement",
+  "icon": "bi-box-seam",
+  "color": "#0891b2",
+  "tagline": "Stock request se shelf tak",
+  "description": "Purchase requests approve karo, orders track karo, aur stock apne aap update hota rahe.",
+  "fields": [
+    {
+      "label": "Item Name",
+      "fieldKey": "item_name",
+      "fieldType": "TEXT",
+      "required": true,
+      "optionsJson": null
+    },
+    {
+      "label": "SKU",
+      "fieldKey": "sku",
+      "fieldType": "TEXT",
+      "required": false,
+      "optionsJson": null
+    },
+    {
+      "label": "Quantity",
+      "fieldKey": "quantity",
+      "fieldType": "NUMBER",
+      "required": true,
+      "optionsJson": null
+    },
+    {
+      "label": "Supplier",
+      "fieldKey": "supplier",
+      "fieldType": "TEXT",
+      "required": false,
+      "optionsJson": null
+    },
+    {
+      "label": "Supplier Email",
+      "fieldKey": "supplier_email",
+      "fieldType": "EMAIL",
+      "required": false,
+      "optionsJson": null
+    },
+    {
+      "label": "Current Stock",
+      "fieldKey": "current_stock",
+      "fieldType": "NUMBER",
+      "required": false,
+      "optionsJson": null
+    }
+  ],
+  "stages": [
+    {
+      "name": "Requested",
+      "code": "requested",
+      "sequence": 1,
+      "isDefault": true,
+      "isFinal": false,
+      "color": "#6366f1",
+      "statuses": []
+    },
+    {
+      "name": "Approved",
+      "code": "approved",
+      "sequence": 2,
+      "isDefault": false,
+      "isFinal": false,
+      "color": "#0ea5e9",
+      "statuses": []
+    },
+    {
+      "name": "Ordered",
+      "code": "ordered",
+      "sequence": 3,
+      "isDefault": false,
+      "isFinal": false,
+      "color": "#f59e0b",
+      "statuses": [
+        {
+          "name": "PO Sent",
+          "color": "#f59e0b",
+          "isDefault": true
+        },
+        {
+          "name": "Partially Received",
+          "color": "#0ea5e9",
+          "isDefault": false
+        },
+        {
+          "name": "Delayed",
+          "color": "#ef4444",
+          "isDefault": false
+        }
+      ]
+    },
+    {
+      "name": "Received",
+      "code": "received",
+      "sequence": 4,
+      "isDefault": false,
+      "isFinal": false,
+      "color": "#a855f7",
+      "statuses": []
+    },
+    {
+      "name": "Stocked",
+      "code": "stocked",
+      "sequence": 5,
+      "isDefault": false,
+      "isFinal": true,
+      "color": "#22c55e",
+      "statuses": []
+    },
+    {
+      "name": "Rejected",
+      "code": "rejected",
+      "sequence": 6,
+      "isDefault": false,
+      "isFinal": true,
+      "color": "#ef4444",
+      "statuses": []
+    }
+  ],
+  "automations": [
+    {
+      "name": "PO email to supplier",
+      "trigger": "STAGE_CHANGED",
+      "triggerStageCode": "ordered",
+      "triggerStatusName": null,
+      "actionType": "SEND_EMAIL",
+      "actionFieldKey": "supplier_email",
+      "actionValue": null,
+      "emailSubject": "Purchase Order - {item_name}",
+      "emailMessage": "Order: {quantity} x {item_name} (SKU {sku}). Kindly confirm delivery date.",
+      "note": "Ordered stage par supplier ko PO email"
+    },
+    {
+      "name": "Stock update on receive",
+      "trigger": "STAGE_CHANGED",
+      "triggerStageCode": "received",
+      "triggerStatusName": null,
+      "actionType": "ADJUST_FIELD",
+      "actionFieldKey": "current_stock",
+      "actionValue": "1",
+      "emailSubject": null,
+      "emailMessage": null,
+      "note": "Received par stock badhao (quantity apne hisaab se adjust karein)"
+    },
+    {
+      "name": "Supplier delay reminder",
+      "trigger": "STATUS_CHANGED",
+      "triggerStageCode": "ordered",
+      "triggerStatusName": "Delayed",
+      "actionType": "SEND_EMAIL",
+      "actionFieldKey": "supplier_email",
+      "actionValue": null,
+      "emailSubject": "Reminder: PO pending - {item_name}",
+      "emailMessage": "Our order of {quantity} x {item_name} (SKU {sku}) is past the expected date. Please share the delivery status.",
+      "note": "Status 'Delayed' par supplier ko reminder email"
+    }
+  ],
+  "industry": "Procurement / Inventory",
+  "tags": [
+    "purchase",
+    "vendor",
+    "stock"
+  ],
+  "language": "en",
+  "whatsappTemplates": [
+    {
+      "name": "po_sent_vendor",
+      "purpose": "Purchase order sent to a vendor",
+      "category": "UTILITY",
+      "language": "en",
+      "bodyText": "Hello {{1}}, purchase order {{2}} has been sent. Please confirm the delivery date by replying here.",
+      "exampleParams": [
+        "Sharma Traders",
+        "PO-118"
+      ]
+    },
+    {
+      "name": "delivery_followup",
+      "purpose": "Chase a pending delivery",
+      "category": "UTILITY",
+      "language": "en",
+      "bodyText": "Hello {{1}}, order {{2}} is still pending on our side. Could you share the dispatch status?",
+      "exampleParams": [
+        "Sharma Traders",
+        "PO-118"
+      ]
+    }
+  ],
+  "playbook": {
+    "goal": "Every purchase request gets approved, ordered and received on time — chase vendors automatically.",
+    "qualificationKeys": [
+      "quantity",
+      "supplier"
+    ],
+    "quietStart": 20,
+    "quietEnd": 9,
+    "maxFollowUps": 3,
+    "rules": [
+      {
+        "name": "Request pending approval 2 days",
+        "trigger": "STAGE_IDLE",
+        "action": "CREATE_TASK",
+        "active": true,
+        "afterMinutes": 2880,
+        "stageCodes": [
+          "requested"
+        ],
+        "taskTitle": "Approve or reject this purchase request",
+        "taskDueHours": 24,
+        "message": "Pending approval for 2 days: {item_name} x {quantity}"
+      },
+      {
+        "name": "Ordered but not received in 7 days",
+        "trigger": "STAGE_IDLE",
+        "action": "SEND_MESSAGE",
+        "active": true,
+        "afterMinutes": 10080,
+        "stageCodes": [
+          "ordered"
+        ],
+        "maxRepeats": 2,
+        "repeatEveryMinutes": 4320,
+        "aiCompose": false,
+        "templateName": null,
+        "message": "Hello {supplier}, our order for {item_name} ({quantity}) is still pending on our side. Could you share the dispatch status?",
+        "templateParams": []
+      }
+    ]
+  }
+}

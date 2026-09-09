@@ -1,0 +1,337 @@
+{
+  "key": "real_estate",
+  "name": "Real Estate Leads",
+  "icon": "bi-buildings",
+  "color": "#16a34a",
+  "tagline": "Site visit se registry tak ka safar",
+  "description": "Property enquiries manage karo — budget, location, site visits aur booking sab ek jagah.",
+  "fields": [
+    {
+      "label": "Client Name",
+      "fieldKey": "client_name",
+      "fieldType": "TEXT",
+      "required": true,
+      "optionsJson": null
+    },
+    {
+      "label": "Phone",
+      "fieldKey": "phone",
+      "fieldType": "PHONE",
+      "required": true,
+      "optionsJson": null
+    },
+    {
+      "label": "Budget",
+      "fieldKey": "budget",
+      "fieldType": "NUMBER",
+      "required": false,
+      "optionsJson": null
+    },
+    {
+      "label": "Property Type",
+      "fieldKey": "property_type",
+      "fieldType": "SELECT",
+      "required": false,
+      "optionsJson": "[\"1BHK\",\"2BHK\",\"3BHK\",\"Villa\",\"Plot\",\"Commercial\"]"
+    },
+    {
+      "label": "Preferred Location",
+      "fieldKey": "location",
+      "fieldType": "TEXT",
+      "required": false,
+      "optionsJson": null
+    },
+    {
+      "label": "Site Visit Date",
+      "fieldKey": "visit_date",
+      "fieldType": "DATE",
+      "required": false,
+      "optionsJson": null
+    }
+  ],
+  "stages": [
+    {
+      "name": "Enquiry",
+      "code": "enquiry",
+      "sequence": 1,
+      "isDefault": true,
+      "isFinal": false,
+      "color": "#6366f1",
+      "statuses": []
+    },
+    {
+      "name": "Site Visit",
+      "code": "site_visit",
+      "sequence": 2,
+      "isDefault": false,
+      "isFinal": false,
+      "color": "#0ea5e9",
+      "statuses": [
+        {
+          "name": "Scheduled",
+          "color": "#0ea5e9",
+          "isDefault": true
+        },
+        {
+          "name": "Visited",
+          "color": "#22c55e",
+          "isDefault": false
+        },
+        {
+          "name": "No Show",
+          "color": "#ef4444",
+          "isDefault": false
+        }
+      ]
+    },
+    {
+      "name": "Negotiation",
+      "code": "negotiation",
+      "sequence": 3,
+      "isDefault": false,
+      "isFinal": false,
+      "color": "#f59e0b",
+      "statuses": [
+        {
+          "name": "Offer Made",
+          "color": "#f59e0b",
+          "isDefault": true
+        },
+        {
+          "name": "Considering",
+          "color": "#0ea5e9",
+          "isDefault": false
+        }
+      ]
+    },
+    {
+      "name": "Token / Booking",
+      "code": "booking",
+      "sequence": 4,
+      "isDefault": false,
+      "isFinal": false,
+      "color": "#a855f7",
+      "statuses": []
+    },
+    {
+      "name": "Registry Done",
+      "code": "registry",
+      "sequence": 5,
+      "isDefault": false,
+      "isFinal": true,
+      "color": "#22c55e",
+      "statuses": []
+    },
+    {
+      "name": "Dropped",
+      "code": "dropped",
+      "sequence": 6,
+      "isDefault": false,
+      "isFinal": true,
+      "color": "#ef4444",
+      "statuses": []
+    }
+  ],
+  "automations": [
+    {
+      "name": "Enquiry welcome",
+      "trigger": "RECORD_CREATED",
+      "triggerStageCode": null,
+      "triggerStatusName": null,
+      "actionType": "SEND_WHATSAPP",
+      "actionFieldKey": "phone",
+      "actionValue": null,
+      "emailSubject": null,
+      "emailMessage": "Namaste {client_name} ji! Aapki property enquiry mili — {property_type}, {location}. Team jald call karegi.",
+      "note": "Enquiry aate hi welcome"
+    },
+    {
+      "name": "Site visit reminder",
+      "trigger": "STAGE_CHANGED",
+      "triggerStageCode": "site_visit",
+      "triggerStatusName": null,
+      "actionType": "SEND_WHATSAPP",
+      "actionFieldKey": "phone",
+      "actionValue": null,
+      "emailSubject": null,
+      "emailMessage": "{client_name} ji, aapki site visit {visit_date} ko scheduled hai. Milte hain!",
+      "note": "Site Visit stage par reminder"
+    },
+    {
+      "name": "No show - reschedule",
+      "trigger": "STATUS_CHANGED",
+      "triggerStageCode": "site_visit",
+      "triggerStatusName": "No Show",
+      "actionType": "SEND_WHATSAPP",
+      "actionFieldKey": "phone",
+      "actionValue": null,
+      "emailSubject": null,
+      "emailMessage": "{client_name} ji, aaj visit nahi ho payi — koi baat nahi! Naya time bata dein, hum arrange kar denge.",
+      "note": "Status 'No Show' par turant re-schedule nudge"
+    },
+    {
+      "name": "Visit feedback",
+      "trigger": "STATUS_CHANGED",
+      "triggerStageCode": "site_visit",
+      "triggerStatusName": "Visited",
+      "actionType": "SEND_WHATSAPP",
+      "actionFieldKey": "phone",
+      "actionValue": null,
+      "emailSubject": null,
+      "emailMessage": "{client_name} ji, property kaisi lagi? Pasand aayi ho to best offer ke liye batayein!",
+      "note": "Visit ke turant baad feedback + push"
+    }
+  ],
+  "industry": "Real estate",
+  "tags": [
+    "property",
+    "site visit",
+    "booking"
+  ],
+  "language": "hinglish",
+  "whatsappTemplates": [
+    {
+      "name": "property_enquiry_welcome",
+      "purpose": "First reply to a property enquiry",
+      "category": "UTILITY",
+      "language": "en",
+      "bodyText": "Hi {{1}}, thanks for your interest! Tell me your budget and preferred location and I'll share matching options with photos.",
+      "exampleParams": [
+        "Amit"
+      ]
+    },
+    {
+      "name": "site_visit_reminder",
+      "purpose": "Reminder a day before the site visit",
+      "category": "UTILITY",
+      "language": "en",
+      "bodyText": "Hi {{1}}, reminder: your site visit is scheduled for {{2}}. Reply YES to confirm or tell me a better time.",
+      "exampleParams": [
+        "Amit",
+        "Sunday 11 AM"
+      ]
+    },
+    {
+      "name": "property_followup",
+      "purpose": "Follow-up after a visit or silence",
+      "category": "UTILITY",
+      "language": "en",
+      "bodyText": "Hi {{1}}, did the options I shared work for you? I can arrange another visit or share new listings in your budget.",
+      "exampleParams": [
+        "Amit"
+      ]
+    }
+  ],
+  "agent": {
+    "name": "Property Assistant",
+    "persona": "You are a helpful real-estate assistant. Learn the buyer's budget, preferred location and property type, share what the knowledge says about projects, and push gently for a site visit — that is where deals happen. Never quote prices that are not in the knowledge.",
+    "welcomeMessage": "Hi! Looking for a home or an investment? Share your budget and location and I'll suggest options.",
+    "handoffKeywords": "agent, call me, negotiate, human",
+    "pipelineMode": "SUGGEST",
+    "captureFields": true,
+    "stageHints": [
+      {
+        "stageCode": "site_visit",
+        "hint": "a site visit date or time is agreed"
+      },
+      {
+        "stageCode": "negotiation",
+        "hint": "the buyer asks about final price, discount or payment plan"
+      },
+      {
+        "stageCode": "booking",
+        "hint": "the buyer confirms a token or booking amount"
+      },
+      {
+        "stageCode": "dropped",
+        "hint": "the buyer says they bought elsewhere or are no longer looking"
+      }
+    ]
+  },
+  "playbook": {
+    "goal": "Get the buyer to a site visit, then to a booking. Always propose a concrete visit slot.",
+    "qualificationKeys": [
+      "phone",
+      "budget",
+      "location"
+    ],
+    "quietStart": 21,
+    "quietEnd": 9,
+    "maxFollowUps": 4,
+    "rules": [
+      {
+        "name": "Welcome enquiry",
+        "trigger": "RECORD_CREATED",
+        "action": "SEND_MESSAGE",
+        "active": true,
+        "afterMinutes": 3,
+        "stageCodes": [
+          "enquiry"
+        ],
+        "aiCompose": true,
+        "templateName": "property_enquiry_welcome",
+        "message": "Hi {client_name}, thanks for your interest! Share your budget and preferred location and I'll send matching options.",
+        "templateParams": [
+          "client_name"
+        ]
+      },
+      {
+        "name": "Follow up quiet buyers",
+        "trigger": "NO_REPLY",
+        "action": "SEND_MESSAGE",
+        "active": true,
+        "afterMinutes": 1440,
+        "stageCodes": [
+          "enquiry",
+          "site_visit"
+        ],
+        "maxRepeats": 3,
+        "repeatEveryMinutes": 2880,
+        "aiCompose": true,
+        "templateName": "property_followup",
+        "message": "Hi {client_name}, did the options work for you? I can arrange a site visit this week.",
+        "templateParams": [
+          "client_name"
+        ]
+      },
+      {
+        "name": "Qualified → brochure",
+        "trigger": "QUALIFIED",
+        "action": "SEND_DOCUMENT",
+        "active": true,
+        "stageCodes": [
+          "enquiry",
+          "site_visit",
+          "negotiation"
+        ],
+        "aiCompose": true,
+        "message": "Hi {client_name}, here is the brochure for projects in your budget and location. When can you come for a site visit?"
+      },
+      {
+        "name": "Hot buyer → call now",
+        "trigger": "INTEREST",
+        "action": "HANDOFF",
+        "active": true,
+        "interest": "HOT",
+        "taskTitle": "Call this buyer and fix a site visit",
+        "taskDueHours": 2,
+        "message": "AI marks this buyer HOT — call and lock a visit slot."
+      },
+      {
+        "name": "Stuck 10 days → task",
+        "trigger": "STAGE_IDLE",
+        "action": "CREATE_TASK",
+        "active": true,
+        "afterMinutes": 14400,
+        "stageCodes": [
+          "site_visit",
+          "negotiation",
+          "booking"
+        ],
+        "taskTitle": "Revive this buyer (new listing / offer)",
+        "taskDueHours": 24,
+        "message": "No movement for 10 days. Share a new listing or a limited offer."
+      }
+    ]
+  }
+}

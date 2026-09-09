@@ -36,6 +36,13 @@ public enum AutomationActionType {
      * phone/email field, emailSubject/emailMessage become the subject/body
      * (WhatsApp: emailMessage is the caption).
      */
-    SEND_DOCUMENT
+    SEND_DOCUMENT,
+
+    /**
+     * Creates a task for a person. value = task title, emailMessage = notes
+     * (both accept {fieldKey}), emailSubject = hours until due (default 24).
+     * Assigned to the record's assignee, else the form owner.
+     */
+    CREATE_TASK
 
 }

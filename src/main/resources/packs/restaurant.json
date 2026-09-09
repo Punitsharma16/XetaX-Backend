@@ -1,0 +1,294 @@
+{
+  "key": "restaurant",
+  "name": "Restaurant Orders",
+  "icon": "bi-shop",
+  "color": "#ea580c",
+  "tagline": "Order aaya, bana, pahucha — sab track",
+  "description": "Har order ki live journey — kitchen se customer tak, WhatsApp updates ke saath.",
+  "fields": [
+    {
+      "label": "Customer Name",
+      "fieldKey": "customer_name",
+      "fieldType": "TEXT",
+      "required": true,
+      "optionsJson": null
+    },
+    {
+      "label": "Phone",
+      "fieldKey": "phone",
+      "fieldType": "PHONE",
+      "required": true,
+      "optionsJson": null
+    },
+    {
+      "label": "Order Items",
+      "fieldKey": "order_items",
+      "fieldType": "TEXTAREA",
+      "required": true,
+      "optionsJson": null
+    },
+    {
+      "label": "Amount",
+      "fieldKey": "amount",
+      "fieldType": "NUMBER",
+      "required": false,
+      "optionsJson": null
+    },
+    {
+      "label": "Order Type",
+      "fieldKey": "order_type",
+      "fieldType": "SELECT",
+      "required": false,
+      "optionsJson": "[\"Dine-in\",\"Takeaway\",\"Delivery\"]"
+    },
+    {
+      "label": "Address",
+      "fieldKey": "address",
+      "fieldType": "TEXTAREA",
+      "required": false,
+      "optionsJson": null
+    }
+  ],
+  "stages": [
+    {
+      "name": "Placed",
+      "code": "placed",
+      "sequence": 1,
+      "isDefault": true,
+      "isFinal": false,
+      "color": "#6366f1",
+      "statuses": []
+    },
+    {
+      "name": "Confirmed",
+      "code": "confirmed",
+      "sequence": 2,
+      "isDefault": false,
+      "isFinal": false,
+      "color": "#0ea5e9",
+      "statuses": []
+    },
+    {
+      "name": "Preparing",
+      "code": "preparing",
+      "sequence": 3,
+      "isDefault": false,
+      "isFinal": false,
+      "color": "#f59e0b",
+      "statuses": [
+        {
+          "name": "In Kitchen",
+          "color": "#f59e0b",
+          "isDefault": true
+        },
+        {
+          "name": "Delayed",
+          "color": "#ef4444",
+          "isDefault": false
+        }
+      ]
+    },
+    {
+      "name": "Ready",
+      "code": "ready",
+      "sequence": 4,
+      "isDefault": false,
+      "isFinal": false,
+      "color": "#a855f7",
+      "statuses": [
+        {
+          "name": "Awaiting Pickup",
+          "color": "#a855f7",
+          "isDefault": true
+        },
+        {
+          "name": "Out for Delivery",
+          "color": "#0ea5e9",
+          "isDefault": false
+        }
+      ]
+    },
+    {
+      "name": "Completed",
+      "code": "completed",
+      "sequence": 5,
+      "isDefault": false,
+      "isFinal": true,
+      "color": "#22c55e",
+      "statuses": []
+    },
+    {
+      "name": "Cancelled",
+      "code": "cancelled",
+      "sequence": 6,
+      "isDefault": false,
+      "isFinal": true,
+      "color": "#ef4444",
+      "statuses": []
+    }
+  ],
+  "automations": [
+    {
+      "name": "Order received",
+      "trigger": "RECORD_CREATED",
+      "triggerStageCode": null,
+      "triggerStatusName": null,
+      "actionType": "SEND_WHATSAPP",
+      "actionFieldKey": "phone",
+      "actionValue": null,
+      "emailSubject": null,
+      "emailMessage": "Order mil gaya! Total: Rs {amount}. Jald confirm karte hain. 🍽️",
+      "note": "Order aate hi customer ko confirmation"
+    },
+    {
+      "name": "Order ready",
+      "trigger": "STAGE_CHANGED",
+      "triggerStageCode": "ready",
+      "triggerStatusName": null,
+      "actionType": "SEND_WHATSAPP",
+      "actionFieldKey": "phone",
+      "actionValue": null,
+      "emailSubject": null,
+      "emailMessage": "{customer_name} ji, aapka order ready hai!",
+      "note": "Ready hote hi customer ko message"
+    },
+    {
+      "name": "Order delayed - sorry",
+      "trigger": "STATUS_CHANGED",
+      "triggerStageCode": "preparing",
+      "triggerStatusName": "Delayed",
+      "actionType": "SEND_WHATSAPP",
+      "actionFieldKey": "phone",
+      "actionValue": null,
+      "emailSubject": null,
+      "emailMessage": "{customer_name} ji, order me thoda extra time lag raha hai — jaldi hi ready hoga. Sorry! 🙏",
+      "note": "Status 'Delayed' par customer ko pehle hi bata do"
+    },
+    {
+      "name": "Out for delivery",
+      "trigger": "STATUS_CHANGED",
+      "triggerStageCode": "ready",
+      "triggerStatusName": "Out for Delivery",
+      "actionType": "SEND_WHATSAPP",
+      "actionFieldKey": "phone",
+      "actionValue": null,
+      "emailSubject": null,
+      "emailMessage": "{customer_name} ji, aapka order raste me hai! 🛵",
+      "note": "Delivery nikalte hi live update"
+    }
+  ],
+  "industry": "Restaurant / Food",
+  "tags": [
+    "orders",
+    "delivery",
+    "table booking"
+  ],
+  "language": "hinglish",
+  "whatsappTemplates": [
+    {
+      "name": "order_confirmed",
+      "purpose": "Confirm an order",
+      "category": "UTILITY",
+      "language": "en",
+      "bodyText": "Hi {{1}}, your order is confirmed and being prepared. Estimated time: {{2}}. Thank you for ordering with us!",
+      "exampleParams": [
+        "Priya",
+        "35 minutes"
+      ]
+    },
+    {
+      "name": "order_ready",
+      "purpose": "Order ready / out for delivery",
+      "category": "UTILITY",
+      "language": "en",
+      "bodyText": "Hi {{1}}, your order is on its way. Enjoy your meal!",
+      "exampleParams": [
+        "Priya"
+      ]
+    },
+    {
+      "name": "feedback_request",
+      "purpose": "Ask for feedback after the order",
+      "category": "MARKETING",
+      "language": "en",
+      "bodyText": "Hi {{1}}, hope you enjoyed your meal! Reply with a rating 1-5 and any feedback — it helps us serve you better.",
+      "exampleParams": [
+        "Priya"
+      ]
+    }
+  ],
+  "agent": {
+    "name": "Order Assistant",
+    "persona": "You are a cheerful restaurant assistant. Share the menu, timings, delivery areas and offers from the knowledge, take orders or table bookings (name, phone, items, address/time), and confirm clearly. Never invent prices.",
+    "welcomeMessage": "Hi! Hungry? Ask for the menu or tell me what you'd like to order.",
+    "handoffKeywords": "complaint, wrong order, refund, manager, human",
+    "pipelineMode": "AUTO",
+    "captureFields": true,
+    "stageHints": [
+      {
+        "stageCode": "confirmed",
+        "hint": "the customer confirms the items and address/time"
+      },
+      {
+        "stageCode": "preparing",
+        "hint": "the customer confirms the items and address/time"
+      },
+      {
+        "stageCode": "cancelled",
+        "hint": "the customer cancels the order"
+      }
+    ]
+  },
+  "playbook": {
+    "goal": "Confirm every order fast, keep the customer informed, and bring them back with feedback and offers.",
+    "qualificationKeys": [
+      "phone",
+      "order_items"
+    ],
+    "quietStart": 23,
+    "quietEnd": 9,
+    "maxFollowUps": 2,
+    "rules": [
+      {
+        "name": "Order not confirmed in 10 min",
+        "trigger": "STAGE_IDLE",
+        "action": "SEND_MESSAGE",
+        "active": true,
+        "afterMinutes": 10,
+        "stageCodes": [
+          "placed"
+        ],
+        "maxRepeats": 1,
+        "aiCompose": true,
+        "message": "Hi {customer_name}, we received your order request — shall I confirm it? Reply YES."
+      },
+      {
+        "name": "Feedback after delivery",
+        "trigger": "STAGE_IDLE",
+        "action": "SEND_MESSAGE",
+        "active": true,
+        "afterMinutes": 120,
+        "stageCodes": [
+          "completed"
+        ],
+        "maxRepeats": 1,
+        "aiCompose": false,
+        "templateName": "feedback_request",
+        "message": "Hope you enjoyed your meal! Reply with a rating 1-5 — it helps us improve.",
+        "templateParams": [
+          "customer_name"
+        ]
+      },
+      {
+        "name": "Complaint → manager",
+        "trigger": "INTEREST",
+        "action": "HANDOFF",
+        "active": true,
+        "interest": "COLD",
+        "taskTitle": "Unhappy customer — call back",
+        "taskDueHours": 1,
+        "message": "AI sentiment is negative. A manager should call this customer."
+      }
+    ]
+  }
+}
