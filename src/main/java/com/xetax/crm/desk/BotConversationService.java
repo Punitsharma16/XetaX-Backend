@@ -51,6 +51,8 @@ import tools.jackson.databind.JsonNode;
 import tools.jackson.databind.ObjectMapper;
 
 import java.time.LocalDateTime;
+import java.util.regex.Matcher;
+import java.util.regex.Pattern;
 import java.time.format.DateTimeFormatter;
 import java.util.*;
 
@@ -160,6 +162,7 @@ public class BotConversationService {
         if (!quotaService.tryConsumeAgent(agent.getOwnerUserId(), agent.getId(), agent.getName())) {
             return result(session, QUOTA_TEXT);
         }
+        captureContactFromText(agent, cfg, session, text);
         String reply = aiTurn(agent, cfg, session, text);
         return result(session, reply);
     }
@@ -257,6 +260,7 @@ public class BotConversationService {
             requestHandoff(session, cfg, "AI quota exhausted");
             return;
         }
+        captureContactFromText(agent, cfg, session, text);
         String reply = aiTurn(agent, cfg, session, text);
         if (reply != null && !reply.isBlank()) sendWhatsApp(session, reply, null);
     }
@@ -349,7 +353,9 @@ public class BotConversationService {
                 OUTPUT FORMAT — respond with ONE JSON object and nothing else:
                 {"reply": "<what you say to the customer>",
                  "actions": [ %s ]}
-                Allowed action objects (use only when clearly justified by the conversation; usually none):
+                ALWAYS add an "update_field" action for every detail the customer just told you
+                (name, phone, email, budget, city …) — that is how the business saves their enquiry;
+                the other actions only when the situation below clearly happened:
                 %s  {"type":"handoff","reason":"<why>"}
 
                 KNOWLEDGE:
@@ -423,6 +429,66 @@ public class BotConversationService {
                     .append(' ').append(session.getCustomerPhone() == null ? "" : session.getCustomerPhone()).append('\n');
         }
         return new RecordContext(catalog.toString(), block.toString());
+    }
+
+    private static final Pattern EMAIL_IN_TEXT =
+            Pattern.compile("[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\\.[A-Za-z]{2,}");
+    private static final Pattern PHONE_IN_TEXT =
+            Pattern.compile("(?<![0-9])(\\+?[0-9][0-9 .-]{8,17}[0-9])(?![0-9])");
+
+    /**
+     * Reads the phone / email straight out of what the customer typed. The model
+     * is asked to send an "update_field" action for these, but it forgets often
+     * enough that enquiries were being lost — identity is too important to leave
+     * to the LLM, so it is also picked up deterministically here. Never
+     * overwrites something already known, and only runs when field capture is on.
+     */
+    private void captureContactFromText(AiAgent agent, AgentChannelConfig cfg, ChatSession session, String text) {
+        if (!cfg.isCaptureFields() || cfg.getTargetFormId() == null || text == null || text.isBlank()) return;
+        boolean found = false;
+
+        if (blank(session.getCustomerEmail())) {
+            Matcher m = EMAIL_IN_TEXT.matcher(text);
+            if (m.find()) { session.setCustomerEmail(trim(m.group().toLowerCase(), 190)); found = true; }
+        }
+        if (blank(session.getCustomerPhone())) {
+            Matcher m = PHONE_IN_TEXT.matcher(text);
+            while (m.find()) {
+                String digits = m.group(1).replaceAll("[^0-9]", "");
+                if (digits.length() >= 10 && digits.length() <= 15) {
+                    session.setCustomerPhone(trim(m.group(1).trim().startsWith("+") ? "+" + digits : digits, 32));
+                    found = true;
+                    break;
+                }
+            }
+        }
+        if (!found) return;
+        sessions.save(session);
+
+        try {
+            RecordDocument record = ensureRecord(session, cfg, agent);
+            if (record == null) return;
+            List<FormField> fields = formMetaCache.getFields(cfg.getTargetFormId());
+            Map<String, Object> data = record.getData() == null
+                    ? new LinkedHashMap<>() : new LinkedHashMap<>(record.getData());
+            boolean changed = fillIfBlank(data, firstField(fields, true), session.getCustomerPhone())
+                    | fillIfBlank(data, firstField(fields, false), session.getCustomerEmail());
+            if (changed) {
+                record.setData(data);
+                record.setUpdatedAt(LocalDateTime.now());
+                recordRepo.save(record);
+            }
+        } catch (Exception e) {
+            log.warn("Contact capture from text failed: {}", e.getMessage());
+        }
+    }
+
+    private static boolean fillIfBlank(Map<String, Object> data, FormField field, String value) {
+        if (field == null || value == null || value.isBlank()) return false;
+        Object existing = data.get(field.getFieldKey());
+        if (existing != null && !String.valueOf(existing).isBlank()) return false;
+        data.put(field.getFieldKey(), value);
+        return true;
     }
 
     private static boolean capturable(FormField f) {
@@ -755,11 +821,47 @@ public class BotConversationService {
     }
 
     private static Object coerce(FormField field, String value) {
-        if (field.getFieldType() == FieldType.NUMBER) {
-            String digits = value.replaceAll("[^0-9]", "");
-            try { return Long.parseLong(digits); } catch (Exception e) { return value; }
+        if (field.getFieldType() == FieldType.NUMBER || field.getFieldType() == FieldType.DECIMAL) {
+            Double amount = parseAmount(value);
+            if (amount == null) return value.trim();
+            if (field.getFieldType() == FieldType.NUMBER && amount == Math.rint(amount)
+                    && Math.abs(amount) < 9.0e18) {
+                return (long) (double) amount;
+            }
+            return amount;
         }
         return value.trim();
+    }
+
+    private static final Pattern AMOUNT = Pattern.compile("(\\d+(?:\\.\\d+)?)");
+    private static final Pattern AMOUNT_UNIT =
+            Pattern.compile("^\\s*(lakhs?|lacs?|l|crores?|cr|k|thousands?|hazaa?r|millions?|mn)\\b");
+
+    /**
+     * Customers say "5 lakh", "₹2,50,000", "2.5 cr", "50k" — never a bare
+     * integer. Stripping non-digits used to turn "5 lakh" into 5, so a NUMBER
+     * field ended up with nonsense. Returns null when there is no number at all.
+     */
+    static Double parseAmount(String raw) {
+        if (raw == null || raw.isBlank()) return null;
+        String s = raw.toLowerCase().replace(",", "").replace("\u20b9", " ").trim();
+        Matcher number = AMOUNT.matcher(s);
+        if (!number.find()) return null;
+        double value;
+        try {
+            value = Double.parseDouble(number.group(1));
+        } catch (NumberFormatException e) {
+            return null;
+        }
+        Matcher unit = AMOUNT_UNIT.matcher(s.substring(number.end()));
+        if (unit.find()) {
+            String u = unit.group(1);
+            if (u.startsWith("lakh") || u.startsWith("lac") || u.equals("l")) value *= 100_000d;
+            else if (u.startsWith("cr")) value *= 10_000_000d;
+            else if (u.startsWith("k") || u.startsWith("thousand") || u.startsWith("hazar") || u.startsWith("hazaar")) value *= 1_000d;
+            else if (u.startsWith("million") || u.equals("mn")) value *= 1_000_000d;
+        }
+        return value;
     }
 
     /* ================================================================ handoff */
