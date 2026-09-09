@@ -52,6 +52,15 @@ interface HandoffRequestRepository extends JpaRepository<HandoffRequest, Long> {
     long countByOwnerUserIdAndStatus(String ownerUserId, String status);
     List<HandoffRequest> findByStatusAndEscalatedFalseAndCreatedAtBefore(String status, LocalDateTime before);
 
+    /* Requests nobody got to in time (expired) or sent back to the AI. They stay
+       visible in the desk for a day so a customer who asked for a person is
+       never lost just because the panel was closed at that moment. */
+    List<HandoffRequest> findTop20ByOwnerUserIdAndStatusInAndCreatedAtAfterOrderByCreatedAtDesc(
+            String ownerUserId, List<String> statuses, LocalDateTime after);
+
+    long countByOwnerUserIdAndStatusInAndCreatedAtAfter(
+            String ownerUserId, List<String> statuses, LocalDateTime after);
+
     /** First-accept-wins: only flips the row if it is still OPEN. Returns 1 or 0. */
     @Modifying
     @Query("""
@@ -60,4 +69,13 @@ interface HandoffRequestRepository extends JpaRepository<HandoffRequest, Long> {
              where h.id = :id and h.status = 'OPEN'
             """)
     int claim(@Param("id") Long id, @Param("userId") String userId, @Param("now") LocalDateTime now);
+
+    /** Picking up a missed chat later — same first-wins guard, other statuses. */
+    @Modifying
+    @Query("""
+            update HandoffRequest h
+               set h.status = 'ACCEPTED', h.acceptedBy = :userId, h.acceptedAt = :now, h.resolvedAt = null
+             where h.id = :id and h.status in ('EXPIRED', 'DECLINED')
+            """)
+    int claimMissed(@Param("id") Long id, @Param("userId") String userId, @Param("now") LocalDateTime now);
 }

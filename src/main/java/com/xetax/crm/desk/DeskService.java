@@ -59,11 +59,20 @@ public class DeskService {
     }
 
     /** Cheap poll: is there anything for me? */
+    /** Statuses a request lands in when nobody answered it in time. */
+    private static final List<String> MISSED_STATUSES = List.of("EXPIRED", "DECLINED");
+    /** How far back the desk keeps showing those missed requests. */
+    private static final int MISSED_HOURS = 24;
+
     public Map<String, Object> badge() {
         String own = owner();
         return Map.of(
                 "open", handoffs.countByOwnerUserIdAndStatus(own, "OPEN"),
                 "mine", sessions.countByOwnerUserIdAndStatusAndAcceptedBy(own, ChatSession.STATUS_HUMAN, me()),
+                // Not part of the red count (it would sit there all day) — the
+                // drawer shows it so an unanswered customer is never lost.
+                "missed", handoffs.countByOwnerUserIdAndStatusInAndCreatedAtAfter(
+                        own, MISSED_STATUSES, LocalDateTime.now().minusHours(MISSED_HOURS)),
                 "enabled", deskEnabled(own));
     }
 
@@ -77,13 +86,7 @@ public class DeskService {
         String own = owner();
         List<Map<String, Object>> requests = new ArrayList<>();
         for (HandoffRequest r : handoffs.findByOwnerUserIdAndStatusOrderByCreatedAtAsc(own, "OPEN")) {
-            Map<String, Object> m = new LinkedHashMap<>();
-            m.put("id", r.getId()); m.put("sessionId", r.getSessionId()); m.put("channel", r.getChannel());
-            m.put("customer", r.getCustomerLabel()); m.put("lastMessage", r.getLastMessage());
-            m.put("aiSummary", r.getAiSummary()); m.put("reason", r.getReason());
-            m.put("createdAt", r.getCreatedAt()); m.put("escalated", r.isEscalated());
-            sessions.findById(r.getSessionId()).ifPresent(s -> m.put("recordId", s.getRecordId()));
-            requests.add(m);
+            requests.add(requestRow(r));
         }
         List<Map<String, Object>> mine = new ArrayList<>();
         for (ChatSession s : sessions.findByOwnerUserIdAndStatusAndAcceptedByOrderByLastMessageAtDesc(own, ChatSession.STATUS_HUMAN, me())) {
@@ -96,10 +99,28 @@ public class DeskService {
                 if (!me().equals(s.getAcceptedBy())) others.add(sessionRow(s));
             }
         }
+        List<Map<String, Object>> missed = new ArrayList<>();
+        for (HandoffRequest r : handoffs.findTop20ByOwnerUserIdAndStatusInAndCreatedAtAfterOrderByCreatedAtDesc(
+                own, MISSED_STATUSES, LocalDateTime.now().minusHours(MISSED_HOURS))) {
+            missed.add(requestRow(r));
+        }
+
         Map<String, Object> out = new LinkedHashMap<>();
         out.put("requests", requests); out.put("mine", mine); out.put("others", others);
+        out.put("missed", missed);
         out.put("enabled", deskEnabled(own));
         return out;
+    }
+
+    private Map<String, Object> requestRow(HandoffRequest r) {
+        Map<String, Object> m = new LinkedHashMap<>();
+        m.put("id", r.getId()); m.put("sessionId", r.getSessionId()); m.put("channel", r.getChannel());
+        m.put("customer", r.getCustomerLabel()); m.put("lastMessage", r.getLastMessage());
+        m.put("aiSummary", r.getAiSummary()); m.put("reason", r.getReason());
+        m.put("createdAt", r.getCreatedAt()); m.put("escalated", r.isEscalated());
+        m.put("status", r.getStatus()); m.put("resolvedAt", r.getResolvedAt());
+        sessions.findById(r.getSessionId()).ifPresent(s -> m.put("recordId", s.getRecordId()));
+        return m;
     }
 
     private Map<String, Object> sessionRow(ChatSession s) {
@@ -122,6 +143,11 @@ public class DeskService {
                 .filter(x -> x.getOwnerUserId().equals(own))
                 .orElseThrow(() -> new ResourceNotFoundException("Request not found"));
         int claimed = handoffs.claim(requestId, me(), LocalDateTime.now());
+        if (claimed == 0) {
+            // Missed requests (expired / sent back to the AI) can still be picked
+            // up from the "Missed" list — same first-wins guard.
+            claimed = handoffs.claimMissed(requestId, me(), LocalDateTime.now());
+        }
         if (claimed == 0) throw new BadRequestException("Someone on your team already took this chat.");
 
         ChatSession s = sessions.findById(r.getSessionId()).orElseThrow(() -> new ResourceNotFoundException("Chat not found"));

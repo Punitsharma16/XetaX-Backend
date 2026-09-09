@@ -80,6 +80,15 @@ public class DeskJobs {
                 sessions.save(s);
                 bot.aiMessage(s, "Our team is busy right now. Share your phone number or email and they'll call you back shortly — meanwhile I'm happy to keep helping.");
 
+                // The request leaves the "waiting" list here, so tell the team it
+                // happened — otherwise a customer who asked for a person while the
+                // panel was closed disappears without a trace. It stays pickable
+                // for a day under Desk → Missed.
+                bot.notifyDesk(s.getOwnerUserId(),
+                        "Missed chat: " + BotConversationService.labelOf(s),
+                        "Nobody picked it up in time — open the desk to reply.",
+                        "/app/dashboard?desk=open");
+
                 if (s.getCustomerPhone() != null || s.getCustomerEmail() != null) {
                     taskRepository.save(TaskItem.builder()
                             .ownerUserId(s.getOwnerUserId()).createdBy(s.getOwnerUserId()).assignedTo(s.getOwnerUserId())
