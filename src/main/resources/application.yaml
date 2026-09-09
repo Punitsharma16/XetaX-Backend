@@ -221,3 +221,8 @@ app:
 razorpay:
   key-id: ${RAZORPAY_KEY_ID:}
   key-secret: ${RAZORPAY_KEY_SECRET:}
+
+xetax:
+  kafka:
+    # false = never touch the producer (no broker deployed); events are processed inline.
+    publish-enabled: ${KAFKA_PUBLISH_ENABLED:true}

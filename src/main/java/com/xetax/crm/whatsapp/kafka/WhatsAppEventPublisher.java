@@ -3,6 +3,7 @@ package com.xetax.crm.whatsapp.kafka;
 import com.xetax.crm.whatsapp.config.WhatsAppModuleConfig;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.kafka.core.KafkaTemplate;
 import org.springframework.stereotype.Component;
 
@@ -20,6 +21,14 @@ public class WhatsAppEventPublisher {
 
     private final KafkaTemplate<String, String> kafkaTemplate;
 
+    /**
+     * KAFKA_PUBLISH_ENABLED=false (deployments without a broker) skips the
+     * producer entirely: no 3 s metadata timeout per webhook, no reconnect
+     * noise in the logs — callers go straight to inline processing.
+     */
+    @Value("${xetax.kafka.publish-enabled:true}")
+    private boolean publishEnabled;
+
     public boolean publishCampaignSend(Long campaignId, String payloadJson) {
         return publish(WhatsAppModuleConfig.TOPIC_CAMPAIGN_SEND, String.valueOf(campaignId), payloadJson);
     }
@@ -30,6 +39,7 @@ public class WhatsAppEventPublisher {
     }
 
     private boolean publish(String topic, String key, String value) {
+        if (!publishEnabled) return false;
         try {
             kafkaTemplate.send(topic, key, value).get();
             return true;
