@@ -46,6 +46,13 @@ public class AuthUserEntity implements UserDetails {
      */
     private Boolean emailVerified;
 
+    /**
+     * Runs the XetaX platform itself, not a customer workspace: sees every
+     * workspace, changes plans and AI credits. Never granted through the UI —
+     * only by PLATFORM_ADMIN_EMAILS on the server or another platform admin.
+     */
+    private Boolean platformAdmin;
+
     @PrePersist
     protected void onCreate() {
         Instant now = Instant.now();

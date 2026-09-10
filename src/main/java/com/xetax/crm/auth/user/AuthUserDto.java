@@ -34,6 +34,8 @@ public class AuthUserDto implements Serializable {
     private String company;
     private String parentId;
     private Boolean emailVerified;
+    /** True only for the XetaX team's own accounts. */
+    private Boolean platformAdmin;
     private Instant createAt = Instant.now();
     private Instant updateAt = Instant.now();
     private LoginProvider provider;

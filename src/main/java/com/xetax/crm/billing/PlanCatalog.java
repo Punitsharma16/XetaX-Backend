@@ -24,6 +24,9 @@ public final class PlanCatalog {
         put("STARTER",  new Plan("STARTER",  "Starter",      25,    0, false, 0,   1,   2,     500));
         put("GROWTH",   new Plan("GROWTH",   "Growth",      500,    0, false, 0,   5, 999,  25_000));
         put("BUSINESS", new Plan("BUSINESS", "Business",   2000, 3000, false, 0, 999, 999, 999_999));
+        // The XetaX team's own workspace: nothing to sell it, nothing to expire.
+        // AI is still metered so real usage stays visible, just never blocking.
+        put("PLATFORM", new Plan("PLATFORM", "Platform",  100_000, 100_000, false, 0, 9_999, 9_999, 9_999_999));
     }};
 
     public static final List<Pack> PACKS = List.of(
