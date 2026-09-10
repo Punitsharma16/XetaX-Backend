@@ -81,6 +81,7 @@ public class UserCacheService {
         snapshot.put("company", user.getCompany());
         snapshot.put("phone", user.getPhone());
         snapshot.put("parentId", user.getParentId());
+        snapshot.put("platformAdmin", Boolean.TRUE.equals(user.getPlatformAdmin()));
         return objectMapper.writeValueAsString(snapshot);
     }
 
@@ -96,6 +97,7 @@ public class UserCacheService {
         user.setCompany((String) snapshot.get("company"));
         user.setPhone((String) snapshot.get("phone"));
         user.setParentId((String) snapshot.get("parentId"));
+        user.setPlatformAdmin(Boolean.TRUE.equals(snapshot.get("platformAdmin")));
         return user;
     }
 }

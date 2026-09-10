@@ -2,9 +2,10 @@ package com.xetax.crm.platform;
 
 import com.xetax.crm.auth.security.CurrentUserProvider;
 import com.xetax.crm.auth.user.AuthUserEntity;
-import com.xetax.crm.common.exception.UnauthorizedException;
 import lombok.RequiredArgsConstructor;
+import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Component;
+import org.springframework.web.server.ResponseStatusException;
 
 /**
  * The only door into the platform console. A workspace admin is NOT a platform
@@ -20,7 +21,8 @@ public class PlatformAdminGuard {
     public AuthUserEntity require() {
         AuthUserEntity user = currentUserProvider.currentUserOrNull();
         if (user == null || !Boolean.TRUE.equals(user.getPlatformAdmin())) {
-            throw new UnauthorizedException("Platform administrators only");
+            // 403, never 401 — the caller is signed in, they just may not be here.
+            throw new ResponseStatusException(HttpStatus.FORBIDDEN, "Platform administrators only");
         }
         return user;
     }
