@@ -200,6 +200,13 @@ meta:
     api-read-timeout-ms: ${META_API_READ_TIMEOUT_MS:15000}
     api-max-retries: ${META_API_MAX_RETRIES:2}
 
+  # Facebook / Instagram lead ads. Same Meta app as WhatsApp above — only the
+  # Facebook-Login-for-Business configuration and the webhook token differ.
+  ads:
+    config-id: ${META_LEADS_CONFIG_ID:}
+    webhook-verify-token: ${META_LEADS_WEBHOOK_VERIFY_TOKEN:}
+    insights-lookback-days: ${META_INSIGHTS_LOOKBACK_DAYS:7}
+
 # In-app video meetings (WebRTC). public-base-url builds the guest links that
 # get WhatsApp'd / emailed — set APP_PUBLIC_BASE_URL to the real domain in prod.
 app:

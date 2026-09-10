@@ -75,6 +75,7 @@ public class SecurityConfig {
                                 "/login/oauth2/**",
                                 "/api/public/integrations/**",
                                 "/api/public/whatsapp/**",
+                                "/api/public/meta/**",
                                 "/api/public/meetings/**",
                                 "/api/public/agents/**",
                                 "/api/public/forms/**",
