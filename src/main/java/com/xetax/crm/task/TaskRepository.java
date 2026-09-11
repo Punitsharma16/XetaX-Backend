@@ -20,4 +20,6 @@ public interface TaskRepository extends JpaRepository<TaskItem, Long> {
 
     long countByAssignedToAndStatusAndDueAtBetween(String assignedTo, String status,
                                                    LocalDateTime from, LocalDateTime to);
+
+    long countByAssignedToAndStatusAndDueAtLessThan(String assignedTo, String status, LocalDateTime before);
 }

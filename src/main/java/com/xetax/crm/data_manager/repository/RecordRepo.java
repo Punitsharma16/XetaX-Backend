@@ -4,6 +4,7 @@ import com.xetax.crm.data_manager.documents.RecordDocument;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
 import org.springframework.data.mongodb.repository.MongoRepository;
+import org.springframework.data.mongodb.repository.Query;
 import org.springframework.stereotype.Repository;
 
 import java.util.List;
@@ -30,6 +31,14 @@ public interface RecordRepo extends MongoRepository<RecordDocument,String> {
     long countByFormIdIn(java.util.List<Long> formIds);
 
     long countByFormIdInAndCreatedAtGreaterThanEqual(java.util.List<Long> formIds, java.time.LocalDateTime after);
+
+    /** Dashboard activity series: only the two fields it buckets on, never the payload. */
+    @Query(value = "{ 'formId': { $in: ?0 }, 'createdAt': { $gte: ?1 } }", fields = "{ 'createdAt': 1, 'assignedTo': 1 }")
+    List<RecordDocument> findCreatedSince(java.util.List<Long> formIds, java.time.LocalDateTime after);
+
+    long countByFormIdInAndStageIdInAndUpdatedAtGreaterThanEqual(java.util.List<Long> formIds, java.util.List<Long> stageIds, java.time.LocalDateTime after);
+
+    long countByFormIdInAndStageIdInAndAssignedToAndUpdatedAtGreaterThanEqual(java.util.List<Long> formIds, java.util.List<Long> stageIds, String assignedTo, java.time.LocalDateTime after);
 
     long countByFormIdInAndAssignedToAndCreatedAtGreaterThanEqual(java.util.List<Long> formIds, String assignedTo, java.time.LocalDateTime after);
 

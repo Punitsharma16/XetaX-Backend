@@ -25,6 +25,7 @@ import lombok.RequiredArgsConstructor;
 import org.springframework.data.domain.PageRequest;
 import org.springframework.stereotype.Service;
 
+import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.util.ArrayList;
 import java.util.HashMap;
@@ -56,6 +57,7 @@ public class DashboardService {
     private final WhatsAppConfigRepository whatsAppConfigRepository;
     private final WhatsAppMessageRepository whatsAppMessageRepository;
     private final OrgSmtpService orgSmtpService;
+    private final com.xetax.crm.task.TaskRepository taskRepository;
 
     public Map<String, Object> summary() {
         UUID ownerId = currentUserProvider.currentDataOwnerIdOrNull();
@@ -149,6 +151,63 @@ public class DashboardService {
                     });
         }
         out.put("pipelines", pipelines);
+
+        // ------------------------------------------------ activity (trend)
+        // New records per day for the last 14 days, the 14 days before that
+        // for the delta, records that reached a final stage this month, and
+        // the signed-in member's tasks — the numbers a manager reads first.
+        Map<String, Object> activity = new LinkedHashMap<>();
+        LocalDate today = LocalDate.now();
+        LocalDateTime since28 = today.minusDays(27).atStartOfDay();
+        LocalDateTime since14 = today.minusDays(13).atStartOfDay();
+        long[] perDay = new long[14];
+        long prev14 = 0;
+        if (seeOwn && !formIds.isEmpty()) {
+            for (RecordDocument r : recordRepo.findCreatedSince(formIds, since28)) {
+                if (mine != null && !mine.equals(r.getAssignedTo())) continue;
+                if (r.getCreatedAt() == null) continue;
+                if (r.getCreatedAt().isBefore(since14)) { prev14++; continue; }
+                int idx = (int) java.time.temporal.ChronoUnit.DAYS.between(since14.toLocalDate(), r.getCreatedAt().toLocalDate());
+                if (idx >= 0 && idx < 14) perDay[idx]++;
+            }
+        }
+        List<Map<String, Object>> series = new ArrayList<>();
+        long last14 = 0;
+        for (int i = 0; i < 14; i++) {
+            Map<String, Object> d = new LinkedHashMap<>();
+            d.put("date", since14.toLocalDate().plusDays(i).toString());
+            d.put("count", perDay[i]);
+            series.add(d);
+            last14 += perDay[i];
+        }
+        activity.put("series", series);
+        activity.put("last14", last14);
+        activity.put("prev14", prev14);
+
+        long wonThisMonth = 0;
+        if (seeOwn && !formIds.isEmpty()) {
+            List<Long> finalStageIds = new ArrayList<>();
+            for (FormEntity form : forms) {
+                for (FormStage stage : stageRepo.findByFormIdOrderBySequence(form.getId())) {
+                    if (Boolean.TRUE.equals(stage.getIsFinal())) finalStageIds.add(stage.getId());
+                }
+            }
+            if (!finalStageIds.isEmpty()) {
+                LocalDateTime monthStart = today.withDayOfMonth(1).atStartOfDay();
+                wonThisMonth = mine == null
+                        ? recordRepo.countByFormIdInAndStageIdInAndUpdatedAtGreaterThanEqual(formIds, finalStageIds, monthStart)
+                        : recordRepo.countByFormIdInAndStageIdInAndAssignedToAndUpdatedAtGreaterThanEqual(formIds, finalStageIds, mine, monthStart);
+            }
+        }
+        activity.put("wonThisMonth", wonThisMonth);
+
+        Map<String, Object> tasks = new LinkedHashMap<>();
+        String meKey = meId == null ? "" : meId.toString();
+        LocalDateTime dayStart = today.atStartOfDay();
+        tasks.put("dueToday", taskRepository.countByAssignedToAndStatusAndDueAtBetween(meKey, "OPEN", dayStart, dayStart.plusDays(1)));
+        tasks.put("overdue", taskRepository.countByAssignedToAndStatusAndDueAtLessThan(meKey, "OPEN", dayStart));
+        activity.put("tasks", tasks);
+        out.put("activity", activity);
 
         // -------------------------------------------------- recent activity
         List<Map<String, Object>> recent = new ArrayList<>();
