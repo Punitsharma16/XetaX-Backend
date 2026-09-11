@@ -43,6 +43,7 @@ interface ChatSessionMessageRepository extends JpaRepository<ChatSessionMessage,
     List<ChatSessionMessage> findTop40BySessionIdOrderByIdDesc(Long sessionId);
     List<ChatSessionMessage> findTop100BySessionIdAndIdGreaterThanOrderByIdAsc(Long sessionId, Long afterId);
     List<ChatSessionMessage> findTop100BySessionIdOrderByIdDesc(Long sessionId);
+    java.util.Optional<ChatSessionMessage> findTopBySessionIdOrderByIdDesc(Long sessionId);
     void deleteBySessionId(Long sessionId);
 }
 

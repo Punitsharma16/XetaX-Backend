@@ -90,10 +90,11 @@ public class PublicAgentController {
       titleEl.textContent=title;paint();add(welcome,'bot');}
   }).catch(function(){});
 
-  var busy=false,mode='ai',lastId=0,pollTimer=null,waitNote=null;
+  var busy=false,mode='ai',lastId=0,pollTimer=null,waitNote=null,seen={};
+  function advance(id){if(id&&id>lastId)lastId=id;}
   function label(text){var l=document.createElement('div');l.className='xtx-who';l.textContent=text;body.appendChild(l);}
   function showUpdates(d){if(!d||!d.data)return;var msgs=d.data.messages||[];
-    for(var i=0;i<msgs.length;i++){var m=msgs[i];if(m.id>lastId)lastId=m.id;
+    for(var i=0;i<msgs.length;i++){var m=msgs[i];if(seen[m.id])continue;seen[m.id]=1;advance(m.id);
       if(m.role==='HUMAN'){if(waitNote){waitNote.remove();waitNote=null;}add(m.text,'bot human');}
       else if(m.role==='AI'){if(waitNote){waitNote.remove();waitNote=null;}add(m.text,'bot');}
       else if(m.role==='SYSTEM'){if(/joined/.test(m.text)){label(m.text);}}}
@@ -111,7 +112,7 @@ public class PublicAgentController {
       body:JSON.stringify({sessionId:sid,message:q})})
     .then(function(r){return r.json();})
     .then(function(d){if(t)t.remove();var data=d&&d.data||{};if(data.reply)add(data.reply,'bot');
-      setMode(data.mode||'ai');busy=false;})
+      advance(data.lastMessageId);setMode(data.mode||'ai');busy=false;})
     .catch(function(){if(t)t.remove();add('Network issue \\u2014 please try again.','bot');busy=false;});}
   poll();
   send.onclick=ask;input.addEventListener('keydown',function(e){if(e.key==='Enter')ask();});

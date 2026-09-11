@@ -1091,6 +1091,12 @@ public class BotConversationService {
         if (reply != null) out.put("reply", reply);
         out.put("mode", modeOf(session));
         out.put("sessionId", session.getId());
+        // The widget paints AI replies straight from this response, so it must
+        // also learn how far the stored transcript has advanced. Without this
+        // its /updates cursor stayed at 0 and the first poll after a hand-off
+        // replayed every earlier AI line into the chat.
+        messages.findTopBySessionIdOrderByIdDesc(session.getId())
+                .ifPresent(m -> out.put("lastMessageId", m.getId()));
         return out;
     }
 
