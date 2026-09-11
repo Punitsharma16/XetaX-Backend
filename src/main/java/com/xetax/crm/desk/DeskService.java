@@ -119,7 +119,10 @@ public class DeskService {
         m.put("aiSummary", r.getAiSummary()); m.put("reason", r.getReason());
         m.put("createdAt", r.getCreatedAt()); m.put("escalated", r.isEscalated());
         m.put("status", r.getStatus()); m.put("resolvedAt", r.getResolvedAt());
-        sessions.findById(r.getSessionId()).ifPresent(s -> m.put("recordId", s.getRecordId()));
+        sessions.findById(r.getSessionId()).ifPresent(s -> {
+            m.put("recordId", s.getRecordId());
+            m.put("unreadCount", unreadCount(s));
+        });
         return m;
     }
 
@@ -133,7 +136,14 @@ public class DeskService {
         List<ChatSessionMessage> last = messages.findTop40BySessionIdOrderByIdDesc(s.getId());
         m.put("lastMessage", last.isEmpty() ? "" : last.get(0).getText());
         m.put("lastRole", last.isEmpty() ? "" : last.get(0).getRole());
+        m.put("unreadCount", unreadCount(s));
         return m;
+    }
+
+    /** Customer lines nobody on the team has opened yet (the list's red pill). */
+    private long unreadCount(ChatSession s) {
+        long seen = s.getLastSeenMessageId() == null ? 0L : s.getLastSeenMessageId();
+        return messages.countBySessionIdAndRoleAndIdGreaterThan(s.getId(), "CUSTOMER", seen);
     }
 
     @Transactional
@@ -192,6 +202,16 @@ public class DeskService {
             row.put("at", m.getCreatedAt());
             row.put("sender", m.getSenderId() == null ? null : teamService.memberDisplayName(m.getSenderId()));
             rows.add(row);
+        }
+        // Opening the thread is how the team "reads" it: remember the newest
+        // line shown so the list stops counting these as unread — for every
+        // teammate, since it is one shared desk, not per-person inboxes.
+        if (!list.isEmpty()) {
+            long newest = list.get(list.size() - 1).getId();
+            if (s.getLastSeenMessageId() == null || newest > s.getLastSeenMessageId()) {
+                s.setLastSeenMessageId(newest);
+                sessions.save(s);
+            }
         }
         Map<String, Object> out = new LinkedHashMap<>();
         out.put("session", sessionRow(s)); out.put("messages", rows);

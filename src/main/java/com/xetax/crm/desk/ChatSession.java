@@ -92,6 +92,9 @@ public class ChatSession {
 
     private LocalDateTime summaryAt;
 
+    /** Id of the newest line a team member has opened in the desk — unread = customer lines after it. */
+    private Long lastSeenMessageId;
+
     private LocalDateTime lastCustomerAt;
     private LocalDateTime lastMessageAt;
 

@@ -44,6 +44,7 @@ interface ChatSessionMessageRepository extends JpaRepository<ChatSessionMessage,
     List<ChatSessionMessage> findTop100BySessionIdAndIdGreaterThanOrderByIdAsc(Long sessionId, Long afterId);
     List<ChatSessionMessage> findTop100BySessionIdOrderByIdDesc(Long sessionId);
     java.util.Optional<ChatSessionMessage> findTopBySessionIdOrderByIdDesc(Long sessionId);
+    long countBySessionIdAndRoleAndIdGreaterThan(Long sessionId, String role, Long afterId);
     void deleteBySessionId(Long sessionId);
 }
 
