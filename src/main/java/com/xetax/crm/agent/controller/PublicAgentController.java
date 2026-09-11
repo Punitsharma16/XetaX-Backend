@@ -21,6 +21,10 @@ public class PublicAgentController {
 
     private final AgentChatService chatService;
 
+    /** Public https URL of this API (APP_API_BASE_URL) — the same one the embed snippet uses. */
+    @org.springframework.beans.factory.annotation.Value("${app.api-base-url:}")
+    private String apiBaseUrl;
+
     @GetMapping("/{publicKey}/info")
     public ApiResponse<Map<String, Object>> info(@PathVariable String publicKey) {
         return ResponseUtil.success("Agent info", chatService.info(publicKey));
@@ -50,9 +54,19 @@ public class PublicAgentController {
 
     @GetMapping(value = "/{publicKey}/widget.js", produces = "application/javascript")
     public String widget(@PathVariable String publicKey, HttpServletRequest request) {
-        String base = request.getScheme() + "://" + request.getServerName()
-                + (request.getServerPort() == 80 || request.getServerPort() == 443
-                    ? "" : ":" + request.getServerPort());
+        // Behind the reverse proxy the servlet request says http://api…:8085,
+        // and a widget baked with that base can never call home from an https
+        // page (mixed content is blocked silently — "Network issue" to the
+        // visitor). Prefer the configured public URL; derive one only when it
+        // is unset (local dev), honouring X-Forwarded-Proto if the proxy sets it.
+        String base = apiBaseUrl == null ? "" : apiBaseUrl.trim().replaceAll("/+$", "");
+        if (base.isEmpty()) {
+            String scheme = request.getHeader("X-Forwarded-Proto");
+            if (scheme == null || scheme.isBlank()) scheme = request.getScheme();
+            base = scheme + "://" + request.getServerName()
+                    + (request.getServerPort() == 80 || request.getServerPort() == 443
+                        ? "" : ":" + request.getServerPort());
+        }
         return WIDGET_JS
                 .replace("__KEY__", publicKey)
                 .replace("__BASE__", base);
