@@ -235,3 +235,9 @@ xetax:
   kafka:
     # false = never touch the producer (no broker deployed); events are processed inline.
     publish-enabled: ${KAFKA_PUBLISH_ENABLED:true}
+  email:
+    campaign:
+      # Bulk email goes out from each org's OWN SMTP (Profile → Email). Pacing is
+      # per owner so one blast never trips that mailbox's burst limits.
+      max-recipients: ${EMAIL_CAMPAIGN_MAX_RECIPIENTS:5000}
+      sends-per-minute: ${EMAIL_CAMPAIGN_SENDS_PER_MINUTE:60}

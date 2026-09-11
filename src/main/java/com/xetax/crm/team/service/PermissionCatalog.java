@@ -39,6 +39,8 @@ public final class PermissionCatalog {
         GROUPS.put("Contacts", List.of(
                 new Permission("contacts.view", "View contacts and email history"),
                 new Permission("contacts.manage", "Manage contacts and send WhatsApp/email")));
+        GROUPS.put("Email", List.of(
+                new Permission("email.campaigns", "Bulk email campaigns from the org's own SMTP")));
         GROUPS.put("Automations", List.of(
                 new Permission("automations.view", "Automations dekhna"),
                 new Permission("automations.manage", "Automations banana-badalna")));

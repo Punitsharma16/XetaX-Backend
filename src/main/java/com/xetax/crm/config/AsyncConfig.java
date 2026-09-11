@@ -44,6 +44,23 @@ public class AsyncConfig {
     }
 
     /**
+     * Bulk email campaign sends when Kafka is unavailable. Sized like the
+     * WhatsApp pool but separate from it, so a 5,000-recipient email blast
+     * never starves WhatsApp replies (and vice versa).
+     */
+    @Bean(name = "emailExecutor")
+    public ThreadPoolTaskExecutor emailExecutor() {
+        ThreadPoolTaskExecutor executor = new ThreadPoolTaskExecutor();
+        executor.setCorePoolSize(2);
+        executor.setMaxPoolSize(4);
+        executor.setQueueCapacity(1000);
+        executor.setThreadNamePrefix("email-");
+        executor.setRejectedExecutionHandler(new java.util.concurrent.ThreadPoolExecutor.CallerRunsPolicy());
+        executor.initialize();
+        return executor;
+    }
+
+    /**
      * Bot conversations (LLM turns for WhatsApp/website chats). Bounded so a
      * slow model never backs up the webhook thread; overflow is logged and
      * dropped — the customer can always message again.
