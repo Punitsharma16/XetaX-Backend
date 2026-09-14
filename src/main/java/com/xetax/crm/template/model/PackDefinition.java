@@ -1,7 +1,9 @@
 package com.xetax.crm.template.model;
 
 import com.fasterxml.jackson.annotation.JsonIgnoreProperties;
+import com.fasterxml.jackson.annotation.JsonAlias;
 import com.fasterxml.jackson.annotation.JsonInclude;
+import com.fasterxml.jackson.annotation.JsonProperty;
 import lombok.Data;
 
 import java.util.ArrayList;
@@ -61,7 +63,12 @@ public class PackDefinition {
         private String name;
         private String code;
         private int sequence;
+        // Lombok names these properties "default"/"final"; the pack JSON (and
+        // the panel) say isDefault/isFinal. Without the explicit name the flags
+        // silently read as false and no pack stage ever locked.
+        @JsonProperty("isDefault") @JsonAlias({"default"})
         private boolean isDefault;
+        @JsonProperty("isFinal") @JsonAlias({"final"})
         private boolean isFinal;
         private String color;
     }

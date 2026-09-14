@@ -12,6 +12,8 @@ public interface AuthUserRepository extends JpaRepository<AuthUserEntity, UUID> 
 
     boolean existsByEmail(String email);
 
+    boolean existsByPhone(String phone);
+
     java.util.List<AuthUserEntity> findByParentId(String parentId);
 
     long countByParentId(String parentId);

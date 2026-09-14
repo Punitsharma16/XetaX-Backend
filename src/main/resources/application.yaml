@@ -5,6 +5,13 @@ spring:
   application:
     name: crm
 
+  # Jackson 3 fails a request whose JSON leaves a primitive boolean out
+  # (register without the enable/admin flags → 500). Every client of ours and
+  # every integrator's client may omit them — take the field's default instead.
+  jackson:
+    deserialization:
+      fail-on-null-for-primitives: false
+
   ai:
     # Spring AI chat memory (RediSearch index) — same Redis as spring.data.redis.
     # Needs Redis Stack (redis/redis-stack-server); plain redis lacks RediSearch

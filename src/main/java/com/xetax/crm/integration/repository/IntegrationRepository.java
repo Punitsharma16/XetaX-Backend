@@ -10,4 +10,5 @@ public interface IntegrationRepository extends JpaRepository<Integration , Long>
     Optional<Integration> findByIntegrationKey(String integrationKey);
 
     boolean existsByIntegrationKey(String integrationKey);
+    java.util.List<Integration> findByFormId(Long formId);
 }

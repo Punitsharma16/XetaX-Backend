@@ -25,6 +25,8 @@ public class AuthUserServiceImpl implements AuthUserService, UserDetailsService 
     @Autowired
     AuthUserRepository userRepository;
     @Autowired
+    private com.xetax.crm.auth.token.AuthTokenRepository refreshTokenRepository;
+    @Autowired
     ModelMapper modelMapper;
     @Autowired
     PasswordEncoder passwordEncoder;
@@ -40,7 +42,16 @@ public class AuthUserServiceImpl implements AuthUserService, UserDetailsService 
             throw new IllegalArgumentException("Email is required");
         }
         if (userRepository.existsByEmail(userDto.getEmail())) {
-            throw new IllegalArgumentException("Email Already Existed");
+            throw new IllegalArgumentException("This email is already registered");
+        }
+        // users.phone is unique. A blank phone must be stored as NULL (many rows
+        // may have none), and a taken one must be refused here with a plain
+        // message — before this the insert blew up on the index as a 500.
+        if (userDto.getPhone() != null && userDto.getPhone().isBlank()) {
+            userDto.setPhone(null);
+        }
+        if (userDto.getPhone() != null && userRepository.existsByPhone(userDto.getPhone().trim())) {
+            throw new IllegalArgumentException("This phone number is already registered");
         }
         AuthUserEntity user = modelMapper.map(userDto, AuthUserEntity.class);
         user.setId(null);   // MOST IMPORTANT LINE
@@ -101,6 +112,9 @@ public class AuthUserServiceImpl implements AuthUserService, UserDetailsService 
         UUID uuid = AuthUserHelper.parseUUID(userId);
         AuthUserEntity user = userRepository.findById(uuid)
                 .orElseThrow(() -> new ResourceNotFoundException("User Not Found with given id "));
+        // Sessions reference the user (refresh_tokens.user_id, no cascade) —
+        // without this the delete died on the foreign key.
+        refreshTokenRepository.deleteByUser(user);
         userRepository.delete(user);
         userCacheService.evict(uuid);
     }

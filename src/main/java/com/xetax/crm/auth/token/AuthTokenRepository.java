@@ -8,4 +8,6 @@ import java.util.UUID;
 
 public interface AuthTokenRepository extends JpaRepository<RefreshToken, UUID> {
     Optional<RefreshToken> findByJti(String jti);
+
+    void deleteByUser(com.xetax.crm.auth.user.AuthUserEntity user);
 }

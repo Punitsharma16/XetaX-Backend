@@ -44,6 +44,10 @@ public class FormServiceImpl implements FormService{
 
     @Autowired
     com.xetax.crm.automation.repository.AutomationRepository automationRepository;
+    @Autowired
+    com.xetax.crm.integration.repository.IntegrationRepository integrationRepository;
+    @Autowired
+    com.xetax.crm.integration.repository.IntegrationFieldMappingRepository integrationFieldMappingRepository;
 
     @Autowired
     com.xetax.crm.automation.repository.AutomationActionRepository automationActionRepository;
@@ -143,6 +147,13 @@ public class FormServiceImpl implements FormService{
             automationConditionRepository.deleteByAutomationId(automation.getId());
             automationActionRepository.deleteByAutomationId(automation.getId());
             automationRepository.delete(automation);
+        }
+        // Integrations (webhook / REST / Shopify…) point at the form too — their
+        // mappings first, then the integration, or the FK on integrations.form_id
+        // turned the delete into a 500.
+        for (var integration : integrationRepository.findByFormId(id)) {
+            integrationFieldMappingRepository.deleteByIntegrationId(integration.getId());
+            integrationRepository.delete(integration);
         }
         stageRepo.deleteAll(stageRepo.findByFormIdOrderBySequence(id));
         formFieldRepo.deleteAll(formFieldRepo.findByFormIdOrderByDisplayOrder(id));

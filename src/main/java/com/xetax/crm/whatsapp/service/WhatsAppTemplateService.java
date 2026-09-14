@@ -65,7 +65,14 @@ public class WhatsAppTemplateService {
     }
 
     public List<WhatsAppTemplateResponse> myTemplates() {
-        WhatsAppConfig config = configService.requireConnectedConfig();
+        // A list, not a lookup: with no connected number there are simply no
+        // templates. Every page with a WhatsApp composer asks for this on load,
+        // and a 404 here showed up as a failed call on contacts/records for
+        // every workspace that has not connected WhatsApp.
+        WhatsAppConfig config = configService.myConfig()
+                .filter(c -> c.getStatus() == com.xetax.crm.whatsapp.enums.WhatsAppConnectionStatus.CONNECTED)
+                .orElse(null);
+        if (config == null) return List.of();
         return templateRepository
                 .findByOwnerUserIdAndWhatsappConfigIdOrderByNameAsc(config.getOwnerUserId(), config.getId())
                 .stream()
