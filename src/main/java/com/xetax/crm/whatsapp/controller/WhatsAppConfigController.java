@@ -87,6 +87,23 @@ public class WhatsAppConfigController {
                 templateService.createTemplate(request));
     }
 
+    /**
+     * Uploads the sample image/video a Meta reviewer sees for a media header,
+     * and returns the handle to put in the template being created.
+     */
+    @PostMapping("/templates/sample")
+    @RequiresPermission("whatsapp.manage")
+    public ApiResponse<java.util.Map<String, String>> uploadTemplateSample(
+            @RequestParam("file") org.springframework.web.multipart.MultipartFile file) {
+        try {
+            String handle = templateService.uploadSample(
+                    file.getBytes(), file.getOriginalFilename(), file.getContentType());
+            return ResponseUtil.success("Sample uploaded", java.util.Map.of("handle", handle));
+        } catch (java.io.IOException e) {
+            throw new com.xetax.crm.common.exception.BadRequestException("Could not read the uploaded file");
+        }
+    }
+
     @DeleteMapping("/templates/{name}")
     @RequiresPermission("whatsapp.manage")
     public ApiResponse<Void> deleteTemplate(@PathVariable String name) {

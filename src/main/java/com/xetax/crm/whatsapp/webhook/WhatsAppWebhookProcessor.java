@@ -35,6 +35,8 @@ public class WhatsAppWebhookProcessor {
 
     private final com.xetax.crm.notification.NotificationService notificationService;
     private final com.xetax.crm.realtime.RealtimeHub realtimeHub;
+    private final org.springframework.beans.factory.ObjectProvider<
+            com.xetax.crm.whatsapp.service.WhatsAppFlowService> flowServiceProvider;
     private final org.springframework.context.ApplicationEventPublisher eventPublisher;
 
     private static final Map<WhatsAppMessageStatus, Integer> RANK = Map.of(
@@ -253,6 +255,20 @@ public class WhatsAppWebhookProcessor {
             realtimeHub.publishAfterCommit(config.getOwnerUserId(), "whatsapp.inbound",
                     Map.of("conversationId", conversation.getId()));
 
+            // A submitted Flow is a form, not a chat line: the answers go to the
+            // Flow service, which stores them and may open a CRM record.
+            if ("interactive".equals(type)
+                    && "nfm_reply".equals(inbound.path("interactive").path("type").asText(""))) {
+                JsonNode reply = inbound.path("interactive").path("nfm_reply");
+                String responseJson = reply.path("response_json").asText("");
+                try {
+                    flowServiceProvider.getObject().recordSubmission(config.getOwnerUserId(),
+                            flowTokenOf(responseJson), from, conversation.getId(), responseJson);
+                } catch (Exception e) {
+                    log.warn("Flow submission could not be stored: {}", e.getMessage());
+                }
+            }
+
             // Bot desk (AI autopilot / live hand-off) reacts off-thread.
             try {
                 eventPublisher.publishEvent(new WhatsAppInboundEvent(config, conversation, message));
@@ -285,6 +301,21 @@ public class WhatsAppWebhookProcessor {
         if (!body.isBlank()) return body;
 
         return interactive.toString();
+    }
+
+    /**
+     * The token we minted when the Flow was sent. Meta echoes it inside the
+     * submitted payload, and it is the only link back to which customer and
+     * which send this form belongs to.
+     */
+    private String flowTokenOf(String responseJson) {
+        if (responseJson == null || responseJson.isBlank()) return null;
+        try {
+            String token = objectMapper.readTree(responseJson).path("flow_token").asText("");
+            return token.isBlank() ? null : token;
+        } catch (Exception e) {
+            return null;
+        }
     }
 
     private WhatsAppMessageType mapType(String type) {

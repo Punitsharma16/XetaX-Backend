@@ -18,4 +18,13 @@ public interface WhatsAppSender {
 
     WhatsAppSendResult sendMedia(WhatsAppConfig config, String toPhone, String mediaType,
                                  String mediaId, String caption, String filename);
+
+    /**
+     * Opens a published Flow in the customer's chat. flowToken is ours and
+     * comes back untouched when they submit, which is how the answers are
+     * matched to the send.
+     */
+    WhatsAppSendResult sendFlow(WhatsAppConfig config, String toPhone, String metaFlowId,
+                                String flowToken, String ctaText, String bodyText,
+                                String headerText, String footerText);
 }

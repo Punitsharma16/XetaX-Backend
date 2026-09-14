@@ -123,8 +123,214 @@ public class MetaWhatsAppClient {
     }
 
     /** Submits a new template for Meta review. Returns {id, status, category}. */
+    /**
+     * Uploads a sample for a media header and returns Meta's file handle.
+     *
+     * <p>Template review is not the same pipeline as sending: a reviewer has
+     * to see an example of the image, so it goes through the Resumable Upload
+     * API against the APP (not the business number), and the handle it returns
+     * is what the template's `example.header_handle` carries. Two calls —
+     * open a session, then push the bytes at offset 0.
+     */
+    public String uploadTemplateSample(byte[] bytes, String filename, String mimeType) {
+        String appToken = properties.getAppId() + "|" + properties.getAppSecret();
+        if (properties.getAppId().isBlank() || properties.getAppSecret().isBlank()) {
+            throw new WhatsAppProviderException("NO_APP_CREDENTIALS",
+                    "Sample upload needs the Meta app id and secret to be configured.",
+                    "META_APP_ID / META_APP_SECRET missing");
+        }
+        try {
+            String sessionUri = properties.apiUrl("/" + properties.getAppId() + "/uploads")
+                    + "?file_name=" + java.net.URLEncoder.encode(
+                            filename == null ? "sample" : filename, java.nio.charset.StandardCharsets.UTF_8)
+                    + "&file_length=" + bytes.length
+                    + "&file_type=" + java.net.URLEncoder.encode(mimeType, java.nio.charset.StandardCharsets.UTF_8);
+
+            String sessionBody = restClient.post()
+                    .uri(sessionUri)
+                    .header("Authorization", "OAuth " + appToken)
+                    .retrieve()
+                    .body(String.class);
+            String sessionId = objectMapper.readTree(sessionBody == null ? "{}" : sessionBody)
+                    .path("id").asText(null);
+            if (sessionId == null || sessionId.isBlank()) {
+                throw new WhatsAppProviderException("NO_UPLOAD_SESSION",
+                        "Meta did not start the upload. Please try again.",
+                        "uploads returned no id");
+            }
+
+            String uploadBody = restClient.post()
+                    .uri(properties.apiUrl("/" + sessionId))
+                    .header("Authorization", "OAuth " + appToken)
+                    .header("file_offset", "0")
+                    .contentType(MediaType.APPLICATION_OCTET_STREAM)
+                    .body(bytes)
+                    .retrieve()
+                    .body(String.class);
+            String handle = objectMapper.readTree(uploadBody == null ? "{}" : uploadBody)
+                    .path("h").asText(null);
+            if (handle == null || handle.isBlank()) {
+                throw new WhatsAppProviderException("NO_UPLOAD_HANDLE",
+                        "Meta accepted the file but returned no handle.",
+                        "upload returned no h");
+            }
+            return handle;
+        } catch (RestClientResponseException e) {
+            throw toProviderException(e);
+        } catch (WhatsAppProviderException e) {
+            throw e;
+        } catch (Exception e) {
+            throw new WhatsAppProviderException("NETWORK",
+                    "Could not reach Meta to upload the sample. Please try again.",
+                    "sample upload failed: " + e.getMessage());
+        }
+    }
+
     public JsonNode createTemplate(String wabaId, String token, Map<String, Object> payload) {
         return postJson(properties.apiUrl("/" + wabaId + "/message_templates"), token, payload);
+    }
+
+    /* ------------------------------------------------------------- flows */
+
+    /** Every Flow on the WABA, with the fields the panel lists. */
+    public JsonNode listFlows(String wabaId, String token) {
+        return get(properties.apiUrl("/" + wabaId + "/flows"
+                + "?fields=id,name,status,categories,validation_errors&limit=200"), token);
+    }
+
+    /**
+     * Creates the Flow shell. The screens are uploaded separately as an
+     * asset, because Meta validates the JSON on upload and returns the errors
+     * there rather than at creation.
+     */
+    public JsonNode createFlow(String wabaId, String token, String name, List<String> categories) {
+        Map<String, Object> payload = new HashMap<>();
+        payload.put("name", name);
+        payload.put("categories", categories);
+        return postJson(properties.apiUrl("/" + wabaId + "/flows"), token, payload);
+    }
+
+    public JsonNode updateFlowMetadata(String flowId, String token, String name, List<String> categories) {
+        Map<String, Object> payload = new HashMap<>();
+        if (name != null && !name.isBlank()) payload.put("name", name);
+        if (categories != null && !categories.isEmpty()) payload.put("categories", categories);
+        return postJson(properties.apiUrl("/" + flowId), token, payload);
+    }
+
+    /**
+     * Uploads the screens. Meta answers 200 with a `validation_errors` array
+     * even when it accepted the file, so the caller has to read that array —
+     * an empty one is what "this Flow can be published" actually means.
+     */
+    public JsonNode uploadFlowJson(String flowId, String token, String flowJson) {
+        try {
+            byte[] bytes = flowJson.getBytes(java.nio.charset.StandardCharsets.UTF_8);
+            org.springframework.core.io.ByteArrayResource resource =
+                    new org.springframework.core.io.ByteArrayResource(bytes) {
+                        @Override
+                        public String getFilename() {
+                            return "flow.json";
+                        }
+                    };
+            org.springframework.http.HttpHeaders partHeaders = new org.springframework.http.HttpHeaders();
+            partHeaders.setContentType(MediaType.APPLICATION_JSON);
+            org.springframework.http.HttpEntity<org.springframework.core.io.ByteArrayResource> filePart =
+                    new org.springframework.http.HttpEntity<>(resource, partHeaders);
+
+            MultiValueMap<String, Object> form = new LinkedMultiValueMap<>();
+            form.add("name", "flow.json");
+            form.add("asset_type", "FLOW_JSON");
+            form.add("file", filePart);
+
+            String response = restClient.post()
+                    .uri(properties.apiUrl("/" + flowId + "/assets"))
+                    .header("Authorization", "Bearer " + token)
+                    .contentType(MediaType.MULTIPART_FORM_DATA)
+                    .body(form)
+                    .retrieve()
+                    .body(String.class);
+            return objectMapper.readTree(response == null ? "{}" : response);
+        } catch (RestClientResponseException e) {
+            throw toProviderException(e);
+        } catch (Exception e) {
+            throw new WhatsAppProviderException("NETWORK",
+                    "Could not upload the Flow screens. Please try again.",
+                    "flow asset upload failed: " + e.getMessage());
+        }
+    }
+
+    /** Publishing freezes the Flow — after this only a new version can change it. */
+    public JsonNode publishFlow(String flowId, String token) {
+        return postJson(properties.apiUrl("/" + flowId + "/publish"), token, new HashMap<>());
+    }
+
+    /** Retires a published Flow. A deprecated Flow can no longer be sent. */
+    public JsonNode deprecateFlow(String flowId, String token) {
+        return postJson(properties.apiUrl("/" + flowId + "/deprecate"), token, new HashMap<>());
+    }
+
+    /** A web preview URL the panel can open in an iframe to try the Flow. */
+    public JsonNode flowPreview(String flowId, String token) {
+        return get(properties.apiUrl("/" + flowId + "?fields=preview.invalidate(false)"), token);
+    }
+
+    public void deleteFlow(String flowId, String token) {
+        try {
+            restClient.delete()
+                    .uri(properties.apiUrl("/" + flowId))
+                    .header("Authorization", "Bearer " + token)
+                    .retrieve()
+                    .body(String.class);
+        } catch (RestClientResponseException e) {
+            throw toProviderException(e);
+        } catch (Exception e) {
+            throw new WhatsAppProviderException("NETWORK",
+                    "Could not reach WhatsApp servers. Please try again.",
+                    "flow delete failed: " + e.getMessage());
+        }
+    }
+
+    /**
+     * Sends a Flow as an interactive message.
+     *
+     * <p>flowToken is ours, not Meta's: it comes back untouched on the reply,
+     * and is how a submitted form is matched to the customer it was sent to.
+     */
+    public WhatsAppSendResult sendFlowMessage(String phoneNumberId, String token, String toPhone,
+                                              String flowId, String flowToken, String ctaText,
+                                              String bodyText, String headerText, String footerText,
+                                              String firstScreen, Map<String, Object> screenData) {
+        Map<String, Object> actionPayload = new HashMap<>();
+        actionPayload.put("screen", firstScreen == null || firstScreen.isBlank()
+                ? "FIRST_ENTRY_SCREEN" : firstScreen);
+        if (screenData != null && !screenData.isEmpty()) actionPayload.put("data", screenData);
+
+        Map<String, Object> parameters = new HashMap<>();
+        parameters.put("flow_message_version", "3");
+        parameters.put("flow_token", flowToken);
+        parameters.put("flow_id", flowId);
+        parameters.put("flow_cta", ctaText == null || ctaText.isBlank() ? "Open" : ctaText);
+        parameters.put("flow_action", "navigate");
+        parameters.put("flow_action_payload", actionPayload);
+
+        Map<String, Object> interactive = new HashMap<>();
+        interactive.put("type", "flow");
+        if (headerText != null && !headerText.isBlank()) {
+            interactive.put("header", Map.of("type", "text", "text", headerText));
+        }
+        interactive.put("body", Map.of("text", bodyText == null || bodyText.isBlank()
+                ? "Please fill this in" : bodyText));
+        if (footerText != null && !footerText.isBlank()) {
+            interactive.put("footer", Map.of("text", footerText));
+        }
+        interactive.put("action", Map.of("name", "flow", "parameters", parameters));
+
+        Map<String, Object> payload = new HashMap<>();
+        payload.put("messaging_product", "whatsapp");
+        payload.put("to", toPhone);
+        payload.put("type", "interactive");
+        payload.put("interactive", interactive);
+        return sendMessage(phoneNumberId, token, payload);
     }
 
     /** Deletes a template (all languages of that name). */

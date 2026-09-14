@@ -20,6 +20,8 @@ import com.xetax.crm.whatsapp.enums.WhatsAppMessageType;
 import com.xetax.crm.whatsapp.repository.WhatsAppConfigRepository;
 import com.xetax.crm.whatsapp.repository.WhatsAppConversationRepository;
 import com.xetax.crm.whatsapp.repository.WhatsAppMessageRepository;
+import com.xetax.crm.whatsapp.entity.WhatsAppTemplate;
+import com.xetax.crm.whatsapp.repository.WhatsAppTemplateRepository;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.context.annotation.Lazy;
 import org.springframework.scheduling.annotation.Async;
@@ -50,6 +52,7 @@ public class WhatsAppMessagingService {
     private final MetaWhatsAppProperties properties;
     private final RecordService recordService;
     private final MeterRegistry meterRegistry;
+    private final WhatsAppTemplateRepository templateRepository;
 
     /** Meta's customer-service window: free text only within 24h of the last inbound. */
     private static final java.time.Duration SERVICE_WINDOW = java.time.Duration.ofHours(24);
@@ -67,7 +70,8 @@ public class WhatsAppMessagingService {
                                     RateLimiterService rateLimiter,
                                     MetaWhatsAppProperties properties,
                                     @Lazy RecordService recordService,
-                                    MeterRegistry meterRegistry) {
+                                    MeterRegistry meterRegistry,
+                                    WhatsAppTemplateRepository templateRepository) {
         this.messageRepository = messageRepository;
         this.conversationRepository = conversationRepository;
         this.configRepository = configRepository;
@@ -78,6 +82,7 @@ public class WhatsAppMessagingService {
         this.properties = properties;
         this.recordService = recordService;
         this.meterRegistry = meterRegistry;
+        this.templateRepository = templateRepository;
     }
 
     /** True when a free-form text may be sent to this phone (24h window open). */
@@ -381,7 +386,9 @@ public class WhatsAppMessagingService {
         WhatsAppSendResult result;
         if (message.getMessageType() == WhatsAppMessageType.TEMPLATE) {
             result = sender.sendTemplate(config, message.getToPhone(), message.getTemplateName(),
-                    message.getTemplateLanguage(), componentsJson);
+                    message.getTemplateLanguage(),
+                    withHeaderMedia(config, message.getTemplateName(),
+                            message.getTemplateLanguage(), componentsJson));
         } else if (isMedia) {
             String caption = message.getBody() == null ? null
                     : message.getBody().replaceFirst("^\\[[a-z]+\\]\\s*", "");
@@ -456,6 +463,149 @@ public class WhatsAppMessagingService {
             message.setErrorMessage(errorMessage);
             messageRepository.save(message);
         });
+    }
+
+    /**
+     * A template with a media header needs the actual image on every send —
+     * the handle used at approval time was only a sample for the reviewer.
+     * The file lives on the template, so it is attached here rather than in
+     * every caller: the record page, a campaign and the AI tools all send
+     * templates without knowing whether one has a picture on top.
+     *
+     * <p>If the template has no media header, or no file was stored, the
+     * caller's own components are passed through untouched.
+     */
+    private String withHeaderMedia(WhatsAppConfig config, String templateName,
+                                   String language, String componentsJson) {
+        if (templateName == null || templateName.isBlank()) return componentsJson;
+        WhatsAppTemplate template = templateRepository
+                .findByWhatsappConfigIdAndNameAndLanguage(config.getId(), templateName,
+                        language == null || language.isBlank() ? "en" : language)
+                .orElse(null);
+        if (template == null) return componentsJson;
+
+        String format = template.getHeaderFormat();
+        String mediaUrl = template.getHeaderMediaUrl();
+        boolean hasMediaHeader = format != null && mediaUrl != null && !mediaUrl.isBlank()
+                && java.util.List.of("IMAGE", "VIDEO", "DOCUMENT").contains(format);
+        boolean hasCards = template.getCardMediaJson() != null
+                && !template.getCardMediaJson().isBlank();
+        // A carousel usually has no header of its own, so the two are
+        // independent — either alone is reason enough to rewrite the payload.
+        if (!hasMediaHeader && !hasCards) return componentsJson;
+
+        try {
+            com.fasterxml.jackson.databind.ObjectMapper mapper =
+                    new com.fasterxml.jackson.databind.ObjectMapper();
+            java.util.List<java.util.Map<String, Object>> components = componentsJson == null
+                    || componentsJson.isBlank()
+                    ? new java.util.ArrayList<>()
+                    : new java.util.ArrayList<>(mapper.readValue(componentsJson,
+                            new com.fasterxml.jackson.core.type.TypeReference<
+                                    java.util.List<java.util.Map<String, Object>>>() {}));
+
+            // A caller that already supplied one of these wins — it may be
+            // sending a different picture to each recipient.
+            boolean callerSentHeader = components.stream()
+                    .anyMatch(c -> "header".equalsIgnoreCase(String.valueOf(c.get("type"))));
+            boolean callerSentCarousel = components.stream()
+                    .anyMatch(c -> "carousel".equalsIgnoreCase(String.valueOf(c.get("type"))));
+
+            boolean changed = false;
+            if (hasMediaHeader && !callerSentHeader) {
+                String kind = format.toLowerCase();
+                components.add(0, java.util.Map.of("type", "header", "parameters",
+                        java.util.List.of(java.util.Map.of(
+                                "type", kind, kind, java.util.Map.of("link", mediaUrl)))));
+                changed = true;
+            }
+            if (hasCards && !callerSentCarousel) {
+                java.util.Map<String, Object> carousel = carouselParameters(template, mapper);
+                if (carousel != null) {
+                    components.add(carousel);
+                    changed = true;
+                }
+            }
+            return changed ? mapper.writeValueAsString(components) : componentsJson;
+        } catch (Exception e) {
+            log.warn("Could not attach header media for template {}: {}", templateName, e.getMessage());
+            return componentsJson;
+        }
+    }
+
+    /**
+     * Carousel cards carry their own picture on every send, exactly as the
+     * header does. Card bodies with variables are not filled here — a caller
+     * that needs per-card text supplies its own carousel component and this
+     * step is skipped.
+     */
+    private java.util.Map<String, Object> carouselParameters(
+            WhatsAppTemplate template, com.fasterxml.jackson.databind.ObjectMapper mapper) {
+        String cardsJson = template.getCardMediaJson();
+        if (cardsJson == null || cardsJson.isBlank()) return null;
+        try {
+            java.util.List<String> links = mapper.readValue(cardsJson,
+                    new com.fasterxml.jackson.core.type.TypeReference<java.util.List<String>>() {});
+            java.util.List<java.util.Map<String, Object>> cards = new java.util.ArrayList<>();
+            for (int i = 0; i < links.size(); i++) {
+                String link = links.get(i);
+                if (link == null || link.isBlank()) continue;
+                cards.add(java.util.Map.of(
+                        "card_index", i,
+                        "components", java.util.List.of(java.util.Map.of(
+                                "type", "header",
+                                "parameters", java.util.List.of(java.util.Map.of(
+                                        "type", "image", "image", java.util.Map.of("link", link)))))));
+            }
+            return cards.isEmpty() ? null : java.util.Map.of("type", "carousel", "cards", cards);
+        } catch (Exception e) {
+            log.warn("Could not build carousel parameters for {}: {}",
+                    template.getName(), e.getMessage());
+            return null;
+        }
+    }
+
+    /* --------------------------------------------------------------- flows */
+
+    /** A Flow is sent to a phone or to an open conversation, like any message. */
+    public String resolvePhoneForFlow(String rawPhone, Long conversationId) {
+        WhatsAppConfig config = configService.requireConnectedConfig();
+        SendMessageRequest request = new SendMessageRequest();
+        request.setPhone(rawPhone);
+        request.setConversationId(conversationId);
+        String resolved = resolveTargetPhone(request, config);
+        return phoneNumberService.normalize(resolved).orElseThrow(
+                () -> new BadRequestException("'" + resolved + "' is not a valid WhatsApp phone number"));
+    }
+
+    /**
+     * Sends a published Flow.
+     *
+     * <p>A Flow is a free-form interactive message, so the 24-hour window
+     * applies exactly as it does to text — outside it, the Flow has to travel
+     * as a template with a Flow button instead.
+     */
+    @Transactional
+    public WhatsAppMessageResponse sendFlow(com.xetax.crm.whatsapp.entity.WhatsAppFlow flow,
+                                            String phone, String flowToken,
+                                            com.xetax.crm.whatsapp.dto.FlowSendRequest request) {
+        WhatsAppConfig config = configService.requireConnectedConfig();
+        if (!isWindowOpen(config.getId(), phone)) {
+            throw new BadRequestException(
+                    "The 24-hour window for this customer is closed — send a template with a Flow "
+                    + "button instead of the Flow on its own.");
+        }
+        String body = request.getBodyText() == null || request.getBodyText().isBlank()
+                ? "Please fill this in" : request.getBodyText();
+
+        WhatsAppMessage message = queueOutbound(config, phone, WhatsAppMessageType.INTERACTIVE,
+                body, null, null, null, request.getRecordId(), null);
+
+        WhatsAppSendResult result = sender.sendFlow(config, phone, flow.getMetaFlowId(),
+                flowToken, request.getCtaText(), body,
+                request.getHeaderText(), request.getFooterText());
+        applySendResult(message.getId(), result);
+        return toResponse(reload(message.getId()));
     }
 
     /* ------------------------------------------------------------- helpers */

@@ -37,6 +37,11 @@ public class WhatsAppConfigService {
         return id.toString();
     }
 
+    /** The country code numbers are assumed to belong to when none is given. */
+    public String defaultCountryCode() {
+        return properties.getDefaultCountryCode();
+    }
+
     public Optional<WhatsAppConfig> myConfig() {
         return configRepository.findFirstByOwnerUserIdOrderByIdDesc(currentUserId());
     }

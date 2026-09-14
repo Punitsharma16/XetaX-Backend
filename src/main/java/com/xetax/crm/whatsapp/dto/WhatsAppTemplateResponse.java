@@ -13,4 +13,6 @@ public class WhatsAppTemplateResponse {
     private String status;
     private String componentsJson;
     private String rejectionReason;
+    private String headerFormat;
+    private String headerMediaUrl;
 }

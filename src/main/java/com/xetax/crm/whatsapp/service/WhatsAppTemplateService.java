@@ -6,6 +6,8 @@ import com.xetax.crm.ai.rag.KnowledgeIndexer;
 import com.xetax.crm.common.exception.BadRequestException;
 import com.xetax.crm.whatsapp.client.MetaWhatsAppClient;
 import com.xetax.crm.whatsapp.client.WhatsAppProviderException;
+import com.xetax.crm.whatsapp.dto.TemplateButton;
+import com.xetax.crm.whatsapp.dto.TemplateCard;
 import com.xetax.crm.whatsapp.dto.TemplateCreateRequest;
 import com.xetax.crm.whatsapp.dto.WhatsAppTemplateResponse;
 import com.xetax.crm.whatsapp.entity.WhatsAppConfig;
@@ -123,6 +125,16 @@ public class WhatsAppTemplateService {
         template.setLanguage(language);
         template.setCategory(created.path("category").asText(category));
         template.setStatus(created.path("status").asText("PENDING"));
+        template.setHeaderFormat(request.getHeaderFormat() == null || request.getHeaderFormat().isBlank()
+                ? (request.getHeaderText() == null || request.getHeaderText().isBlank() ? "NONE" : "TEXT")
+                : request.getHeaderFormat().trim().toUpperCase());
+        template.setHeaderMediaUrl(request.getHeaderMediaUrl());
+        if (request.getCards() != null && !request.getCards().isEmpty()) {
+            try {
+                template.setCardMediaJson(objectMapper.writeValueAsString(
+                        request.getCards().stream().map(TemplateCard::getHeaderMediaUrl).toList()));
+            } catch (Exception ignored) { }
+        }
         try {
             template.setComponentsJson(objectMapper.writeValueAsString(payload.get("components")));
         } catch (Exception ignored) { }
@@ -130,6 +142,29 @@ public class WhatsAppTemplateService {
         template = templateRepository.save(template);
 
         return toResponse(template);
+    }
+
+    /**
+     * Uploads the sample media a reviewer will see and returns Meta's handle.
+     * The handle is short-lived and is only used while submitting a template.
+     */
+    public String uploadSample(byte[] bytes, String filename, String mimeType) {
+        if (bytes == null || bytes.length == 0) {
+            throw new BadRequestException("The sample file is empty");
+        }
+        if (bytes.length > 5 * 1024 * 1024) {
+            throw new BadRequestException("Sample files must be 5MB or smaller");
+        }
+        String type = mimeType == null || mimeType.isBlank()
+                ? "application/octet-stream" : mimeType;
+        if (!type.startsWith("image/") && !type.startsWith("video/") && !"application/pdf".equals(type)) {
+            throw new BadRequestException("Header samples must be an image, a video or a PDF");
+        }
+        try {
+            return client.uploadTemplateSample(bytes, filename, type);
+        } catch (WhatsAppProviderException e) {
+            throw new BadRequestException("Meta rejected the sample: " + e.getUserMessage());
+        }
     }
 
     /** Removes the template from Meta (all languages) and locally. */
@@ -184,10 +219,10 @@ public class WhatsAppTemplateService {
         }
 
         List<java.util.Map<String, Object>> components = new java.util.ArrayList<>();
-        if (request.getHeaderText() != null && !request.getHeaderText().isBlank()) {
-            components.add(java.util.Map.of(
-                    "type", "HEADER", "format", "TEXT", "text", request.getHeaderText().trim()));
-        }
+        java.util.Map<String, Object> header = headerComponent(
+                request.getHeaderFormat(), request.getHeaderText(), request.getHeaderHandle());
+        if (header != null) components.add(header);
+
         java.util.Map<String, Object> bodyComponent = new java.util.LinkedHashMap<>();
         bodyComponent.put("type", "BODY");
         bodyComponent.put("text", body.trim());
@@ -199,7 +234,202 @@ public class WhatsAppTemplateService {
         if (request.getFooterText() != null && !request.getFooterText().isBlank()) {
             components.add(java.util.Map.of("type", "FOOTER", "text", request.getFooterText().trim()));
         }
+
+        java.util.Map<String, Object> buttons = buttonsComponent(request.getButtons());
+        if (buttons != null) components.add(buttons);
+
+        // A carousel is a BODY plus its cards; the cards carry their own
+        // header, body and buttons, and Meta insists they all match.
+        if (request.getCards() != null && !request.getCards().isEmpty()) {
+            components.add(carouselComponent(request.getCards()));
+        }
         return components;
+    }
+
+    /**
+     * TEXT, a media header, or nothing.
+     *
+     * <p>A media header is submitted without any real media: the reviewer sees
+     * the uploaded sample through `header_handle`, and each send supplies the
+     * actual image. That is why a media header needs a handle and a TEXT one
+     * does not.
+     */
+    private java.util.Map<String, Object> headerComponent(String format, String text, String handle) {
+        String fmt = format == null || format.isBlank() ? "TEXT" : format.trim().toUpperCase();
+        if ("NONE".equals(fmt)) return null;
+
+        if ("TEXT".equals(fmt)) {
+            if (text == null || text.isBlank()) return null;
+            if (text.trim().length() > 60) {
+                throw new BadRequestException("Header text cannot be longer than 60 characters");
+            }
+            return java.util.Map.of("type", "HEADER", "format", "TEXT", "text", text.trim());
+        }
+        if (!List.of("IMAGE", "VIDEO", "DOCUMENT").contains(fmt)) {
+            throw new BadRequestException("Header format must be TEXT, IMAGE, VIDEO, DOCUMENT or NONE");
+        }
+        if (handle == null || handle.isBlank()) {
+            throw new BadRequestException(
+                    "A " + fmt.toLowerCase() + " header needs a sample file — upload one first");
+        }
+        return java.util.Map.of("type", "HEADER", "format", fmt,
+                "example", java.util.Map.of("header_handle", List.of(handle)));
+    }
+
+    /**
+     * Meta's button rules, checked here rather than letting the Graph API
+     * answer with one of its opaque generic errors: at most 10 buttons, at
+     * most 2 of them URL, at most 1 phone number.
+     */
+    private java.util.Map<String, Object> buttonsComponent(List<TemplateButton> buttons) {
+        if (buttons == null || buttons.isEmpty()) return null;
+        if (buttons.size() > 10) {
+            throw new BadRequestException("A template can have at most 10 buttons");
+        }
+        int urlCount = 0;
+        int phoneCount = 0;
+        List<java.util.Map<String, Object>> rows = new java.util.ArrayList<>();
+
+        for (TemplateButton button : buttons) {
+            String type = button.getType() == null ? "" : button.getType().trim().toUpperCase();
+            String text = button.getText() == null ? "" : button.getText().trim();
+            if (text.isBlank()) throw new BadRequestException("Every button needs a label");
+            if (text.length() > 25) {
+                throw new BadRequestException("Button label '" + text + "' is longer than 25 characters");
+            }
+            switch (type) {
+                case "URL" -> {
+                    if (++urlCount > 2) {
+                        throw new BadRequestException("A template can have at most 2 URL buttons");
+                    }
+                    String url = button.getUrl() == null ? "" : button.getUrl().trim();
+                    if (!url.startsWith("http://") && !url.startsWith("https://")) {
+                        throw new BadRequestException("URL button '" + text + "' needs a full https:// link");
+                    }
+                    java.util.Map<String, Object> row = new java.util.LinkedHashMap<>();
+                    row.put("type", "URL");
+                    row.put("text", text);
+                    row.put("url", url);
+                    if (url.contains("{{1}}")) {
+                        String sample = button.getUrlExample();
+                        if (sample == null || sample.isBlank()) {
+                            throw new BadRequestException(
+                                    "URL button '" + text + "' uses {{1}} — give an example link");
+                        }
+                        row.put("example", List.of(sample.trim()));
+                    }
+                    rows.add(row);
+                }
+                case "PHONE_NUMBER" -> {
+                    if (++phoneCount > 1) {
+                        throw new BadRequestException("A template can have only one phone number button");
+                    }
+                    String phone = button.getPhoneNumber() == null ? "" : button.getPhoneNumber().trim();
+                    if (phone.isBlank()) {
+                        throw new BadRequestException("Phone button '" + text + "' needs a number");
+                    }
+                    rows.add(java.util.Map.of("type", "PHONE_NUMBER", "text", text,
+                            "phone_number", phone.startsWith("+") ? phone : "+" + phone));
+                }
+                case "QUICK_REPLY" -> rows.add(java.util.Map.of("type", "QUICK_REPLY", "text", text));
+                case "FLOW" -> {
+                    String flowId = button.getFlowId() == null ? "" : button.getFlowId().trim();
+                    if (flowId.isBlank()) {
+                        throw new BadRequestException("Flow button '" + text + "' needs a published Flow");
+                    }
+                    java.util.Map<String, Object> row = new java.util.LinkedHashMap<>();
+                    row.put("type", "FLOW");
+                    row.put("text", text);
+                    row.put("flow_id", flowId);
+                    row.put("flow_action", button.getFlowAction() == null || button.getFlowAction().isBlank()
+                            ? "navigate" : button.getFlowAction().trim().toLowerCase());
+                    row.put("navigate_screen", "FIRST_ENTRY_SCREEN");
+                    rows.add(row);
+                }
+                default -> throw new BadRequestException(
+                        "Button type must be URL, PHONE_NUMBER, QUICK_REPLY or FLOW");
+            }
+        }
+        return java.util.Map.of("type", "BUTTONS", "buttons", rows);
+    }
+
+    /**
+     * A carousel: two to ten cards that all look alike. Meta rejects a set
+     * whose cards differ in header format or button shape, so that is checked
+     * against the first card before anything is submitted.
+     */
+    private java.util.Map<String, Object> carouselComponent(List<TemplateCard> cards) {
+        if (cards.size() < 2 || cards.size() > 10) {
+            throw new BadRequestException("A carousel needs between 2 and 10 cards");
+        }
+        TemplateCard first = cards.get(0);
+        String sharedFormat = cardFormat(first);
+        int sharedButtons = first.getButtons() == null ? 0 : first.getButtons().size();
+
+        List<java.util.Map<String, Object>> cardNodes = new java.util.ArrayList<>();
+        int index = 0;
+        for (TemplateCard card : cards) {
+            if (!sharedFormat.equals(cardFormat(card))) {
+                throw new BadRequestException(
+                        "Every carousel card must use the same header type (" + sharedFormat + ")");
+            }
+            int buttonCount = card.getButtons() == null ? 0 : card.getButtons().size();
+            if (buttonCount != sharedButtons) {
+                throw new BadRequestException(
+                        "Every carousel card must have the same number of buttons (" + sharedButtons + ")");
+            }
+            if (card.getBodyText() == null || card.getBodyText().isBlank()) {
+                throw new BadRequestException("Carousel card " + (index + 1) + " needs body text");
+            }
+            if (card.getHeaderHandle() == null || card.getHeaderHandle().isBlank()) {
+                throw new BadRequestException(
+                        "Carousel card " + (index + 1) + " needs a sample image — upload one first");
+            }
+
+            List<java.util.Map<String, Object>> cardComponents = new java.util.ArrayList<>();
+            cardComponents.add(java.util.Map.of("type", "HEADER", "format", sharedFormat,
+                    "example", java.util.Map.of("header_handle", List.of(card.getHeaderHandle()))));
+
+            java.util.Map<String, Object> cardBody = new java.util.LinkedHashMap<>();
+            cardBody.put("type", "BODY");
+            cardBody.put("text", card.getBodyText().trim());
+            int vars = variableCountOf(card.getBodyText());
+            if (vars > 0) {
+                List<String> cardExamples = card.getExampleParams() == null
+                        ? List.of() : card.getExampleParams();
+                if (cardExamples.size() < vars) {
+                    throw new BadRequestException("Carousel card " + (index + 1) + " uses {{" + vars
+                            + "}} — provide " + vars + " example value(s)");
+                }
+                cardBody.put("example", java.util.Map.of(
+                        "body_text", List.of(cardExamples.subList(0, vars))));
+            }
+            cardComponents.add(cardBody);
+
+            java.util.Map<String, Object> cardButtons = buttonsComponent(card.getButtons());
+            if (cardButtons != null) cardComponents.add(cardButtons);
+
+            cardNodes.add(java.util.Map.of("card_index", index, "components", cardComponents));
+            index++;
+        }
+        return java.util.Map.of("type", "CAROUSEL", "cards", cardNodes);
+    }
+
+    private static String cardFormat(TemplateCard card) {
+        String fmt = card.getHeaderFormat() == null || card.getHeaderFormat().isBlank()
+                ? "IMAGE" : card.getHeaderFormat().trim().toUpperCase();
+        if (!List.of("IMAGE", "VIDEO").contains(fmt)) {
+            throw new BadRequestException("Carousel cards can only use an IMAGE or VIDEO header");
+        }
+        return fmt;
+    }
+
+    static int variableCountOf(String text) {
+        if (text == null) return 0;
+        java.util.regex.Matcher m = java.util.regex.Pattern.compile("\\{\\{(\\d+)}}").matcher(text);
+        int max = 0;
+        while (m.find()) max = Math.max(max, Integer.parseInt(m.group(1)));
+        return max;
     }
 
     /** Meta-mandated fixed OTP structure for AUTHENTICATION templates. */
@@ -221,6 +451,8 @@ public class WhatsAppTemplateService {
                 .status(template.getStatus())
                 .componentsJson(template.getComponentsJson())
                 .rejectionReason(template.getRejectionReason())
+                .headerFormat(template.getHeaderFormat())
+                .headerMediaUrl(template.getHeaderMediaUrl())
                 .build();
     }
 

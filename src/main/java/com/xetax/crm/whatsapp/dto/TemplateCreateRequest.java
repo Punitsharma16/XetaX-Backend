@@ -20,8 +20,24 @@ public class TemplateCreateRequest {
     /** MARKETING | UTILITY | AUTHENTICATION */
     private String category;
     private String language = "en";
+    /** TEXT (default) | IMAGE | VIDEO | DOCUMENT | NONE */
+    private String headerFormat;
     private String headerText;
+    /**
+     * Media header only: the handle returned by the sample upload endpoint.
+     * Meta wants a real example of the media a reviewer will see.
+     */
+    private String headerHandle;
+    /**
+     * Media header only: the image/video/document every send of this template
+     * will carry. Stored with the template so a campaign does not have to
+     * repeat it on every message.
+     */
+    private String headerMediaUrl;
     private String bodyText;
     private String footerText;
     private List<String> exampleParams;
+    private List<TemplateButton> buttons;
+    /** MARKETING carousel cards. Present only for a carousel template. */
+    private List<TemplateCard> cards;
 }

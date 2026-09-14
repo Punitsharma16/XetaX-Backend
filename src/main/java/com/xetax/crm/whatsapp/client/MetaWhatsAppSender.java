@@ -65,6 +65,19 @@ public class MetaWhatsAppSender implements WhatsAppSender {
     }
 
     /** Null when the config has no usable token — callers fail fast, no network call. */
+    @Override
+    public WhatsAppSendResult sendFlow(WhatsAppConfig config, String toPhone, String metaFlowId,
+                                       String flowToken, String ctaText, String bodyText,
+                                       String headerText, String footerText) {
+        String token = tokenOf(config);
+        if (token == null) {
+            return WhatsAppSendResult.failed("TOKEN", "WhatsApp connection is broken — please reconnect.");
+        }
+        return client.sendFlowMessage(config.getPhoneNumberId(), token, toPhone,
+                metaFlowId, flowToken, ctaText, bodyText, headerText, footerText,
+                "FIRST_ENTRY_SCREEN", null);
+    }
+
     private String tokenOf(com.xetax.crm.whatsapp.entity.WhatsAppConfig config) {
         try {
             return config.getAccessTokenEncrypted() == null
