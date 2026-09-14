@@ -8,9 +8,13 @@ import java.time.Instant;
 
 /** One customer phone number's thread under one WhatsAppConfig. Owner-scoped. */
 @Entity
-@Table(name = "whatsapp_conversations", uniqueConstraints =
-        @UniqueConstraint(name = "uq_wa_conv_config_phone",
-                columnNames = {"whatsapp_config_id", "customer_phone"}))
+@Table(name = "whatsapp_conversations",
+        uniqueConstraints = @UniqueConstraint(name = "uq_wa_conv_config_phone",
+                columnNames = {"whatsapp_config_id", "customer_phone"}),
+        // The inbox reads exactly this: one owner's threads, newest first.
+        // Without it every open inbox scanned the whole table and sorted it.
+        indexes = @Index(name = "idx_wa_conv_owner_last",
+                columnList = "owner_user_id, last_message_at"))
 @Getter
 @Setter
 @NoArgsConstructor

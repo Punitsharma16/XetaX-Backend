@@ -34,6 +34,7 @@ import java.util.Map;
 public class WhatsAppWebhookProcessor {
 
     private final com.xetax.crm.notification.NotificationService notificationService;
+    private final com.xetax.crm.realtime.RealtimeHub realtimeHub;
     private final org.springframework.context.ApplicationEventPublisher eventPublisher;
 
     private static final Map<WhatsAppMessageStatus, Integer> RANK = Map.of(
@@ -206,7 +207,7 @@ public class WhatsAppWebhookProcessor {
             String body = switch (type) {
                 case "text" -> inbound.path("text").path("body").asText("");
                 case "button" -> inbound.path("button").path("text").asText("");
-                case "interactive" -> inbound.path("interactive").toString();
+                case "interactive" -> interactiveText(inbound.path("interactive"));
                 case "image", "video", "audio", "document", "sticker" -> {
                     String caption = inbound.path(type).path("caption").asText("");
                     yield caption.isBlank() ? "[" + type + "]" : "[" + type + "] " + caption;
@@ -244,7 +245,13 @@ public class WhatsAppWebhookProcessor {
             notificationService.push(config.getOwnerUserId(), config.getOwnerUserId(),
                     "WHATSAPP_INBOUND",
                     "WhatsApp: " + (contactName != null && !contactName.isBlank() ? contactName : from),
-                    body, "/app/whatsapp/inbox");
+                    body, "/app/whatsapp/conversations");
+
+            // Wake any open inbox on this workspace. The bell notification
+            // above is personal to the owner; this one is the workspace event
+            // every team member's inbox listens for.
+            realtimeHub.publishAfterCommit(config.getOwnerUserId(), "whatsapp.inbound",
+                    Map.of("conversationId", conversation.getId()));
 
             // Bot desk (AI autopilot / live hand-off) reacts off-thread.
             try {
@@ -253,6 +260,31 @@ public class WhatsAppWebhookProcessor {
                 log.warn("Inbound event publish failed: {}", e.getMessage());
             }
         }
+    }
+
+    /**
+     * What the customer actually tapped, not the envelope it came in.
+     *
+     * <p>An interactive reply arrives as a small object naming its own shape:
+     * a quick-reply button, a row picked from a list, or a submitted Flow. The
+     * whole node used to be stored verbatim, so the inbox showed a customer's
+     * "Yes" as a line of raw JSON. The title is what they saw on their phone,
+     * so that is what the thread shows. Anything unrecognised still falls back
+     * to the raw node — better an ugly line than a silently empty message.
+     */
+    private static String interactiveText(JsonNode interactive) {
+        if (interactive == null || interactive.isMissingNode()) return "";
+        String type = interactive.path("type").asText("");
+        JsonNode reply = interactive.path(type);
+
+        String title = reply.path("title").asText("");
+        if (!title.isBlank()) return title;
+
+        // A submitted Flow carries a human-readable body plus its answers.
+        String body = reply.path("body").asText("");
+        if (!body.isBlank()) return body;
+
+        return interactive.toString();
     }
 
     private WhatsAppMessageType mapType(String type) {

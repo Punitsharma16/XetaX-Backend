@@ -39,6 +39,7 @@ class WhatsAppWebhookProcessorTest {
         recipientRepository = mock(WhatsAppCampaignRecipientRepository.class);
         processor = new WhatsAppWebhookProcessor(
                 mock(com.xetax.crm.notification.NotificationService.class),
+                mock(com.xetax.crm.realtime.RealtimeHub.class),
                 mock(org.springframework.context.ApplicationEventPublisher.class),
                 messageRepository,
                 mock(WhatsAppConversationRepository.class),

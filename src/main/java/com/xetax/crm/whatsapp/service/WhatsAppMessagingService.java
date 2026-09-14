@@ -467,6 +467,14 @@ public class WhatsAppMessagingService {
                     .map(WhatsAppConversation::getCustomerPhone)
                     .orElseThrow(() -> new BadRequestException("Conversation not found"));
         }
+        // An explicit number wins over the record. recordId has two jobs: it
+        // can name the target, but callers that already know the number (the
+        // record page's chat panel) send it only to file the message against
+        // that record. Reading it as a target there rejected a send that had a
+        // perfectly good phone number, asking for a phoneFieldKey nobody needs.
+        if (request.getPhone() != null && !request.getPhone().isBlank()) {
+            return request.getPhone();
+        }
         if (request.getRecordId() != null && !request.getRecordId().isBlank()) {
             if (request.getPhoneFieldKey() == null || request.getPhoneFieldKey().isBlank()) {
                 throw new BadRequestException("phoneFieldKey is required when sending to a record");
@@ -479,9 +487,6 @@ public class WhatsAppMessagingService {
                         "The record has no value in field '" + request.getPhoneFieldKey() + "'");
             }
             return value.toString();
-        }
-        if (request.getPhone() != null && !request.getPhone().isBlank()) {
-            return request.getPhone();
         }
         throw new BadRequestException("A phone number, conversation or record target is required");
     }

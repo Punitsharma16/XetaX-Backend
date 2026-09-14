@@ -1,6 +1,7 @@
 package com.xetax.crm.notification;
 
 import com.xetax.crm.auth.security.CurrentUserProvider;
+import com.xetax.crm.realtime.RealtimeHub;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
@@ -19,12 +20,13 @@ public class NotificationService {
 
     private final NotificationRepository repository;
     private final CurrentUserProvider currentUserProvider;
+    private final RealtimeHub realtimeHub;
 
     /** Fire-and-forget — a failed notification must never break the caller. */
     public void push(String ownerUserId, String targetUserId, String type,
                      String title, String body, String link) {
         try {
-            repository.save(Notification.builder()
+            Notification saved = repository.save(Notification.builder()
                     .ownerUserId(ownerUserId)
                     .targetUserId(targetUserId)
                     .type(type)
@@ -33,6 +35,11 @@ public class NotificationService {
                     .link(cut(link, 300))
                     .createdAt(LocalDateTime.now())
                     .build());
+
+            // Wake the bell instead of waiting for its next poll. Best effort:
+            // nobody connected, or a dead socket, simply changes nothing.
+            realtimeHub.publishAfterCommit(targetUserId, "notification",
+                    Map.of("id", saved.getId(), "kind", type));
         } catch (Exception e) {
             log.warn("Notification push failed: {}", e.getMessage());
         }
