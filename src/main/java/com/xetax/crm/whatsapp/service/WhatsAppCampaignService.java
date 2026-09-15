@@ -53,6 +53,8 @@ public class WhatsAppCampaignService {
     private final WhatsAppEventPublisher eventPublisher;
     private final ObjectMapper objectMapper;
     private final KnowledgeIndexer knowledgeIndexer;
+    private final com.xetax.crm.whatsapp.repository.WhatsAppTemplateRepository templateRepository;
+    private final WhatsAppTemplateVariables templateVariables;
 
     /* ------------------------------------------------------------- create */
 
@@ -85,7 +87,7 @@ public class WhatsAppCampaignService {
                 .templateName(hasTemplate ? request.getTemplateName() : null)
                 .templateLanguage(request.getTemplateLanguage())
                 .sourceType(sourceType)
-                .templateParamsJson(writeParams(request.getTemplateParams()))
+                .templateParamsJson(hasTemplate ? mappingJson(config, request) : writeParams(request.getTemplateParams()))
                 .status(CampaignStatus.DRAFT)
                 .build();
         campaign = campaignRepository.save(campaign);
@@ -374,7 +376,7 @@ public class WhatsAppCampaignService {
             String body = isTemplate ? null
                     : PlaceholderResolver.resolve(campaign.getMessageTemplate(), payload);
             String componentsJson = isTemplate
-                    ? buildTemplateComponents(campaign.getTemplateParamsJson(), payload)
+                    ? buildTemplateComponents(campaign, config, payload)
                     : null;
 
             WhatsAppMessage message = messagingService.queueOutbound(config, recipient.getPhone(),
@@ -401,6 +403,10 @@ public class WhatsAppCampaignService {
                 recipientRepository.save(recipient);
                 campaignRepository.markOneFailed(campaign.getId());
             }
+        } catch (BadRequestException e) {
+            // A template this recipient's data cannot fill — say exactly why.
+            failRecipient(recipient, campaign, e.getMessage());
+            return;
         } catch (Exception e) {
             log.error("Campaign recipient {} failed: {}", recipientId, e.getMessage());
             recipient.setStatus(RecipientStatus.FAILED);
@@ -489,11 +495,74 @@ public class WhatsAppCampaignService {
     }
 
     /**
-     * Builds the Meta template components array: the campaign's ordered
-     * payload keys become {{1}},{{2}}… body parameters, values taken from
-     * this recipient's payload (record data / CSV row). Missing values send
-     * as empty strings rather than failing the whole recipient.
+     * The field/column mapping for every template variable, checked against
+     * the synced template now — a campaign that could never fill its template
+     * is refused at creation, not discovered one failed recipient at a time.
      */
+    private String mappingJson(WhatsAppConfig config, CampaignCreateRequest request) {
+        com.xetax.crm.whatsapp.dto.TemplateVariables mapping = request.getTemplateVariables() != null
+                ? request.getTemplateVariables()
+                : com.xetax.crm.whatsapp.dto.TemplateVariables.ofBody(request.getTemplateParams());
+        com.xetax.crm.whatsapp.entity.WhatsAppTemplate template = templateFor(config.getId(),
+                request.getTemplateName(), request.getTemplateLanguage());
+        // Field keys stand in for values: this only checks every variable is mapped.
+        templateVariables.build(template, mapping);
+        try {
+            String json = objectMapper.writeValueAsString(mapping);
+            if (json.length() > 1000) {
+                throw new BadRequestException("Too many template variables mapped for one campaign");
+            }
+            return json;
+        } catch (BadRequestException e) {
+            throw e;
+        } catch (Exception e) {
+            throw new BadRequestException("Could not save the template variable mapping");
+        }
+    }
+
+    private com.xetax.crm.whatsapp.entity.WhatsAppTemplate templateFor(Long configId, String name, String language) {
+        String lang = language == null || language.isBlank() ? "en" : language;
+        return templateRepository.findByWhatsappConfigIdAndNameAndLanguage(configId, name, lang)
+                .orElseThrow(() -> new BadRequestException("Template '" + name + "' (" + lang
+                        + ") is not synced — sync templates on the WhatsApp page first"));
+    }
+
+    /** Stored mapping: a JSON object (every variable) or an older JSON list (body keys only). */
+    private com.xetax.crm.whatsapp.dto.TemplateVariables readMapping(String json) {
+        if (json == null || json.isBlank()) return new com.xetax.crm.whatsapp.dto.TemplateVariables();
+        try {
+            if (json.trim().startsWith("[")) {
+                return com.xetax.crm.whatsapp.dto.TemplateVariables.ofBody(
+                        objectMapper.readValue(json, new TypeReference<List<String>>() {}));
+            }
+            return objectMapper.readValue(json, com.xetax.crm.whatsapp.dto.TemplateVariables.class);
+        } catch (Exception e) {
+            return new com.xetax.crm.whatsapp.dto.TemplateVariables();
+        }
+    }
+
+    /**
+     * This recipient's template components: each mapped field/column is read
+     * from the recipient's payload (record data / CSV row). An empty value is
+     * refused by the builder and fails this recipient with that reason.
+     */
+    String buildTemplateComponents(WhatsAppCampaign campaign, WhatsAppConfig config, Map<String, Object> payload) {
+        com.xetax.crm.whatsapp.entity.WhatsAppTemplate template = templateFor(config.getId(),
+                campaign.getTemplateName(), campaign.getTemplateLanguage());
+        com.xetax.crm.whatsapp.dto.TemplateVariables mapping = readMapping(campaign.getTemplateParamsJson());
+        com.xetax.crm.whatsapp.dto.TemplateVariables values = templateVariables.map(mapping, key -> {
+            Object value = payload == null ? null : payload.get(key);
+            return value == null ? "" : String.valueOf(value);
+        });
+        // Media links are typed in, not field keys — keep them as they are.
+        values.setHeaderMediaUrl(mapping.getHeaderMediaUrl());
+        for (int i = 0; i < values.getCards().size() && i < mapping.getCards().size(); i++) {
+            values.getCards().get(i).setHeaderMediaUrl(mapping.getCards().get(i).getHeaderMediaUrl());
+        }
+        return templateVariables.build(template, values);
+    }
+
+    /** Legacy body-only builder, kept for any caller still passing a key list. */
     String buildTemplateComponents(String templateParamsJson, Map<String, Object> payload) {
         try {
             if (templateParamsJson == null || templateParamsJson.isBlank()) return null;

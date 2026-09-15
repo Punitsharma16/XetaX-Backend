@@ -25,8 +25,9 @@ import java.util.UUID;
 /**
  * Follow-up autopilot: a deterministic morning digest (no LLM — cheap and
  * reliable) of what needs attention TODAY: leads going cold, unanswered
- * WhatsApp chats, tasks due. Panel notification always; email + WhatsApp
- * best-effort when configured.
+ * WhatsApp chats, tasks due. Panel notification whenever the digest is on;
+ * email and WhatsApp best-effort when configured and not switched off by the
+ * owner (Profile → Morning digest, see DigestPreferenceService).
  */
 @Service
 @RequiredArgsConstructor
@@ -44,6 +45,7 @@ public class AutopilotService {
     private final OrgSmtpService orgSmtpService;
     private final WhatsAppMessagingService whatsAppMessagingService;
     private final AuthUserRepository authUserRepository;
+    private final com.xetax.crm.settings.service.DigestPreferenceService digestPreferences;
 
     /** Har subah 9:00 — every org owner gets their digest. */
     @Scheduled(cron = "0 0 9 * * *")
@@ -54,6 +56,8 @@ public class AutopilotService {
                 .distinct()
                 .forEach(owner -> {
                     try {
+                        // Skip the counting queries for owners who turned it off.
+                        if (!digestPreferences.forOwner(owner).enabled()) return;
                         runFor(owner);
                     } catch (Exception e) {
                         log.warn("Digest for {} failed: {}", owner, e.getMessage());
@@ -97,20 +101,27 @@ public class AutopilotService {
                 ? "All clear — no cold leads, no unanswered chats, no tasks due. 🎉"
                 : "Good morning! These need your attention today:\n" + String.join("\n", lines);
 
+        var channels = digestPreferences.forOwner(owner);
+        if (!channels.enabled()) {
+            return text;   // the owner switched the digest off — deliver nothing
+        }
+
         notificationService.push(owner, owner, "DIGEST",
                 lines.isEmpty() ? "Morning digest — all clear 🎉"
                         : "Morning digest — " + lines.size() + " thing" + (lines.size() == 1 ? "" : "s") + " to check",
                 text, staleTotal > 0 ? "/app/records" : "/app/tasks");
 
         var user = authUserRepository.findById(UUID.fromString(owner)).orElse(null);
-        if (user != null && user.getEmail() != null && orgSmtpService.isConfiguredFor(owner)) {
+        if (channels.emailEnabled() && user != null && user.getEmail() != null
+                && orgSmtpService.isConfiguredFor(owner)) {
             try {
                 orgSmtpService.sendAs(owner, user.getEmail(), "XetaX morning digest", text);
             } catch (Exception e) {
                 log.warn("Digest email for {} failed: {}", owner, e.getMessage());
             }
         }
-        if (user != null && user.getPhone() != null && !user.getPhone().isBlank()) {
+        if (channels.whatsappEnabled() && user != null && user.getPhone() != null
+                && !user.getPhone().isBlank()) {
             try {
                 whatsAppMessagingService.sendTextAsOwner(owner, user.getPhone(), text);
             } catch (Exception e) {

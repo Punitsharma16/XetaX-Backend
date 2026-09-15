@@ -34,6 +34,7 @@ public class ContactService {
     private final CurrentUserProvider currentUserProvider;
     private final OrgSmtpService orgSmtpService;
     private final WhatsAppMessagingService whatsAppMessagingService;
+    private final com.xetax.crm.whatsapp.service.WhatsAppTemplateVariables variablesBuilder;
 
     private String owner() {
         UUID id = currentUserProvider.currentDataOwnerIdOrNull();
@@ -292,7 +293,8 @@ public class ContactService {
 
     /** Text (24h window) ya approved template — template ho to window nahi lagti. */
     public Map<String, Object> bulkWhatsApp(List<Long> ids, String message,
-                                            String templateName, String templateLanguage) {
+                                            String templateName, String templateLanguage,
+                                            com.xetax.crm.whatsapp.dto.TemplateVariables templateVariables) {
         boolean isTemplate = templateName != null && !templateName.isBlank();
         if (!isTemplate) requireText(message, "Message");
         int sent = 0;
@@ -309,6 +311,16 @@ public class ContactService {
                     request.setPhone(contact.getPhone());
                     request.setTemplateName(templateName);
                     request.setTemplateLanguage(templateLanguage);
+                    if (templateVariables != null) {
+                        // {name}, {email}, {phone}, {company} are filled per contact.
+                        final Map<String, Object> data = new java.util.HashMap<>();
+                        data.put("name", contact.getName() == null ? "" : contact.getName());
+                        data.put("email", contact.getEmail() == null ? "" : contact.getEmail());
+                        data.put("phone", contact.getPhone() == null ? "" : contact.getPhone());
+                        data.put("company", contact.getCompany() == null ? "" : contact.getCompany());
+                        request.setTemplateVariables(variablesBuilder.map(templateVariables,
+                                v -> com.xetax.crm.common.util.PlaceholderResolver.resolve(v, data)));
+                    }
                     whatsAppMessagingService.send(request);
                 } else {
                     whatsAppMessagingService.sendTextAsOwner(owner(), contact.getPhone(),

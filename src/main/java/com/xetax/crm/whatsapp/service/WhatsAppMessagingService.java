@@ -53,6 +53,7 @@ public class WhatsAppMessagingService {
     private final RecordService recordService;
     private final MeterRegistry meterRegistry;
     private final WhatsAppTemplateRepository templateRepository;
+    private final WhatsAppTemplateVariables templateVariables;
 
     /** Meta's customer-service window: free text only within 24h of the last inbound. */
     private static final java.time.Duration SERVICE_WINDOW = java.time.Duration.ofHours(24);
@@ -71,7 +72,8 @@ public class WhatsAppMessagingService {
                                     MetaWhatsAppProperties properties,
                                     @Lazy RecordService recordService,
                                     MeterRegistry meterRegistry,
-                                    WhatsAppTemplateRepository templateRepository) {
+                                    WhatsAppTemplateRepository templateRepository,
+                                    WhatsAppTemplateVariables templateVariables) {
         this.messageRepository = messageRepository;
         this.conversationRepository = conversationRepository;
         this.configRepository = configRepository;
@@ -83,6 +85,7 @@ public class WhatsAppMessagingService {
         this.recordService = recordService;
         this.meterRegistry = meterRegistry;
         this.templateRepository = templateRepository;
+        this.templateVariables = templateVariables;
     }
 
     /** True when a free-form text may be sent to this phone (24h window open). */
@@ -119,14 +122,29 @@ public class WhatsAppMessagingService {
 
         boolean interactive = !isTemplate
                 && request.getButtonsJson() != null && !request.getButtonsJson().isBlank();
+
+        // A template is filled from the synced definition, so every variable —
+        // header, body, buttons, carousel cards — gets exactly one value, or
+        // the send is refused here with a sentence naming what is missing.
+        String componentsJson = request.getComponentsJson();
+        if (isTemplate && (componentsJson == null || componentsJson.isBlank())) {
+            String language = request.getTemplateLanguage() == null || request.getTemplateLanguage().isBlank()
+                    ? "en" : request.getTemplateLanguage();
+            WhatsAppTemplate template = templateRepository
+                    .findByWhatsappConfigIdAndNameAndLanguage(config.getId(), request.getTemplateName(), language)
+                    .orElseThrow(() -> new BadRequestException("Template '" + request.getTemplateName()
+                            + "' (" + language + ") is not synced — sync templates on the WhatsApp page first"));
+            componentsJson = templateVariables.build(template, request.getTemplateVariables());
+        }
+
         WhatsAppMessage message = queueOutbound(config, phone,
                 isTemplate ? WhatsAppMessageType.TEMPLATE
                         : (interactive ? WhatsAppMessageType.INTERACTIVE : WhatsAppMessageType.TEXT),
                 request.getMessage(), request.getTemplateName(), request.getTemplateLanguage(),
-                request.getComponentsJson(), request.getRecordId(), null);
+                componentsJson, request.getRecordId(), null);
 
         // For INTERACTIVE the buttons ride the same side-channel templates use.
-        dispatchAsync(message.getId(), interactive ? request.getButtonsJson() : request.getComponentsJson());
+        dispatchAsync(message.getId(), interactive ? request.getButtonsJson() : componentsJson);
         return toResponse(message);
     }
 
@@ -238,16 +256,26 @@ public class WhatsAppMessagingService {
         String phone = phoneNumberService.normalize(rawPhone).orElse(null);
         if (phone == null) return false;
         String lang = language == null || language.isBlank() ? "en" : language;
-        String componentsJson = null;
-        if (bodyParams != null && !bodyParams.isEmpty()) {
-            java.util.List<java.util.Map<String, Object>> parameters = new java.util.ArrayList<>();
-            for (String v : bodyParams) parameters.add(java.util.Map.of("type", "text", "text", v == null ? "" : v));
-            try {
-                componentsJson = new com.fasterxml.jackson.databind.ObjectMapper().writeValueAsString(
-                        java.util.List.of(java.util.Map.of("type", "body", "parameters", parameters)));
-            } catch (Exception e) {
-                return false;
-            }
+        WhatsAppTemplate template = templateRepository
+                .findByWhatsappConfigIdAndNameAndLanguage(config.getId(), templateName, lang).orElse(null);
+        if (template == null) return false;
+
+        // Automated senders (playbook) only know body values. Take exactly as
+        // many as the body has; too few, or other variables it cannot fill,
+        // means the template is skipped and the caller falls back.
+        var slots = templateVariables.slotsOf(template.getComponentsJson(), template.getCategory());
+        java.util.List<String> values = bodyParams == null ? java.util.List.of() : bodyParams;
+        if (values.size() < slots.bodyVars()) {
+            log.debug("Template {} needs {} body values, got {}", templateName, slots.bodyVars(), values.size());
+            return false;
+        }
+        String componentsJson;
+        try {
+            componentsJson = templateVariables.build(template,
+                    com.xetax.crm.whatsapp.dto.TemplateVariables.ofBody(values.subList(0, slots.bodyVars())));
+        } catch (BadRequestException e) {
+            log.debug("Template {} not sent: {}", templateName, e.getMessage());
+            return false;
         }
         WhatsAppMessage message = queueOutbound(config, phone, WhatsAppMessageType.TEMPLATE,
                 "[template] " + templateName, templateName, lang, componentsJson, recordId, null);

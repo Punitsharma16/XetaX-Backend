@@ -22,7 +22,8 @@ public class OutreachController {
 
     public record EmailSend(String to, String subject, String body) {}
     public record WhatsAppSend(String phone, String message, String templateName,
-                               String templateLanguage, String recordId, String buttonsJson) {}
+                               String templateLanguage, String recordId, String buttonsJson,
+                               com.xetax.crm.whatsapp.dto.TemplateVariables templateVariables) {}
 
     @GetMapping("/emails")
     public ApiResponse<List<EmailLog>> emails(@RequestParam String to) {
@@ -44,7 +45,7 @@ public class OutreachController {
     public ApiResponse<Void> sendWhatsApp(@RequestBody WhatsAppSend request) {
         outreachService.sendWhatsApp(request.phone(), request.message(),
                 request.templateName(), request.templateLanguage(), request.recordId(),
-                request.buttonsJson());
+                request.buttonsJson(), request.templateVariables());
         return ResponseUtil.success("WhatsApp sent");
     }
 }

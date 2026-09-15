@@ -182,8 +182,8 @@ class TemplateComponentsTest {
 
     @Test
     void carouselCardsAreIndexedAndEachCarriesItsOwnSample() {
-        TemplateCard first = card("Plan A {{1}}", "4::handleA");
-        TemplateCard second = card("Plan B {{1}}", "4::handleB");
+        TemplateCard first = card("Plan A {{1}} available", "4::handleA");
+        TemplateCard second = card("Plan B {{1}} available", "4::handleB");
 
         TemplateCreateRequest request = base();
         request.setCards(List.of(first, second));
@@ -216,6 +216,57 @@ class TemplateComponentsTest {
         BadRequestException error = assertThrows(BadRequestException.class,
                 () -> service.createTemplate(request));
         assertTrue(error.getMessage().contains("same number of buttons"));
+    }
+
+    @Test
+    void variablesWithAGapAreRefused() {
+        TemplateCreateRequest request = base();
+        request.setBodyText("Hi {{1}}, your {{3}} is ready.");
+        request.setExampleParams(List.of("a", "b", "c"));
+        BadRequestException e = assertThrows(BadRequestException.class, () -> service.createTemplate(request));
+        assertTrue(e.getMessage().contains("{{2}} is missing"));
+    }
+
+    @Test
+    void aBodyStartingOrEndingWithAVariableIsRefused() {
+        TemplateCreateRequest request = base();
+        request.setBodyText("{{1}} welcome aboard");
+        assertThrows(BadRequestException.class, () -> service.createTemplate(request));
+        request.setBodyText("Welcome aboard {{1}}");
+        assertThrows(BadRequestException.class, () -> service.createTemplate(request));
+    }
+
+    @Test
+    void twoVariablesSideBySideAreRefused() {
+        TemplateCreateRequest request = base();
+        request.setBodyText("Hi {{1}} {{2}} there");
+        request.setExampleParams(List.of("a", "b"));
+        BadRequestException e = assertThrows(BadRequestException.class, () -> service.createTemplate(request));
+        assertTrue(e.getMessage().contains("side by side"));
+    }
+
+    @Test
+    void aTextHeaderVariableNeedsAndCarriesItsExample() {
+        TemplateCreateRequest missing = base();
+        missing.setHeaderFormat("TEXT");
+        missing.setHeaderText("{{1}} offer");
+        BadRequestException e = assertThrows(BadRequestException.class, () -> service.createTemplate(missing));
+        assertTrue(e.getMessage().contains("example value"));
+
+        TemplateCreateRequest ok = base();
+        ok.setHeaderFormat("TEXT");
+        ok.setHeaderText("{{1}} offer");
+        ok.setHeaderExample("Diwali");
+        JsonNode header = submit(ok).get(0);
+        assertEquals("TEXT", header.path("format").asText());
+        assertEquals("Diwali", header.path("example").path("header_text").get(0).asText());
+    }
+
+    @Test
+    void aFooterVariableIsRefused() {
+        TemplateCreateRequest request = base();
+        request.setFooterText("Reply {{1}}");
+        assertThrows(BadRequestException.class, () -> service.createTemplate(request));
     }
 
     private TemplateCard card(String body, String handle) {

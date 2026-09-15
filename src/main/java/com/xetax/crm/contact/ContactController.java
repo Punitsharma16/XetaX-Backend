@@ -20,7 +20,8 @@ public class ContactController {
     public record SendEmailRequest(String subject, String body) {}
     public record SendWhatsAppRequest(String message) {}
     public record BulkEmailRequest(List<Long> ids, String subject, String body) {}
-    public record BulkWhatsAppRequest(List<Long> ids, String message, String templateName, String templateLanguage) {}
+    public record BulkWhatsAppRequest(List<Long> ids, String message, String templateName, String templateLanguage,
+                                      com.xetax.crm.whatsapp.dto.TemplateVariables templateVariables) {}
 
     @PostMapping("/import")
     @RequiresPermission("contacts.manage")
@@ -113,6 +114,6 @@ public class ContactController {
     public ApiResponse<Map<String, Object>> bulkWhatsApp(@RequestBody BulkWhatsAppRequest request) {
         return ResponseUtil.success("Bulk WhatsApp done",
                 contactService.bulkWhatsApp(request.ids(), request.message(),
-                        request.templateName(), request.templateLanguage()));
+                        request.templateName(), request.templateLanguage(), request.templateVariables()));
     }
 }

@@ -46,6 +46,8 @@ public class OutreachService {
     private final WhatsAppMessageRepository messageRepository;
     private final PhoneNumberService phoneNumberService;
     private final com.xetax.crm.activity.RecordActivityService activityService;
+    private final org.springframework.beans.factory.ObjectProvider<com.xetax.crm.data_manager.service.RecordService> recordServiceProvider;
+    private final com.xetax.crm.whatsapp.service.WhatsAppTemplateVariables variablesBuilder;
 
     private String owner() {
         UUID id = currentUserProvider.currentDataOwnerIdOrNull();
@@ -127,7 +129,8 @@ public class OutreachService {
 
     /** Free text (24h window) ya approved template — template kabhi bhi jaa sakta hai. */
     public void sendWhatsApp(String phone, String message, String templateName,
-                             String templateLanguage, String recordId, String buttonsJson) {
+                             String templateLanguage, String recordId, String buttonsJson,
+                             com.xetax.crm.whatsapp.dto.TemplateVariables templateVariables) {
         requireSend();
         if (phone == null || phone.isBlank()) throw new BadRequestException("Phone number is missing");
         SendMessageRequest request = new SendMessageRequest();
@@ -137,6 +140,9 @@ public class OutreachService {
         request.setTemplateLanguage(templateLanguage);
         request.setRecordId(recordId);
         request.setButtonsJson(buttonsJson);
+        if (templateVariables != null) {
+            request.setTemplateVariables(resolveForRecord(templateVariables, recordId));
+        }
         try {
             messagingService.send(request);
         } catch (IllegalArgumentException e) {
@@ -151,5 +157,21 @@ public class OutreachService {
                             ? "WhatsApp template '" + templateName + "' sent to " + phone
                             : "WhatsApp message sent to " + phone);
         }
+    }
+
+    /** {fieldKey} placeholders in template values are filled from the record the send is made from. */
+    private com.xetax.crm.whatsapp.dto.TemplateVariables resolveForRecord(
+            com.xetax.crm.whatsapp.dto.TemplateVariables values, String recordId) {
+        if (recordId == null || recordId.isBlank()) return values;
+        java.util.Map<String, Object> data;
+        try {
+            var record = recordServiceProvider.getObject().getById(recordId);
+            data = record.getData() == null ? java.util.Map.of() : record.getData();
+        } catch (Exception e) {
+            return values;
+        }
+        final java.util.Map<String, Object> fields = data;
+        return variablesBuilder.map(values,
+                v -> com.xetax.crm.common.util.PlaceholderResolver.resolve(v, fields));
     }
 }

@@ -23,6 +23,8 @@ public class TemplateCreateRequest {
     /** TEXT (default) | IMAGE | VIDEO | DOCUMENT | NONE */
     private String headerFormat;
     private String headerText;
+    /** Sample value for a {{1}} in headerText — Meta rejects a header variable without one. */
+    private String headerExample;
     /**
      * Media header only: the handle returned by the sample upload endpoint.
      * Meta wants a real example of the media a reviewer will see.

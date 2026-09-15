@@ -218,9 +218,15 @@ public class WhatsAppTemplateService {
                     + variableCount + " example value(s); Meta rejects templates without examples");
         }
 
+        checkVariables("The body", body, true);
+        if (request.getFooterText() != null && request.getFooterText().contains("{{")) {
+            throw new BadRequestException("The footer can't contain variables");
+        }
+
         List<java.util.Map<String, Object>> components = new java.util.ArrayList<>();
         java.util.Map<String, Object> header = headerComponent(
-                request.getHeaderFormat(), request.getHeaderText(), request.getHeaderHandle());
+                request.getHeaderFormat(), request.getHeaderText(), request.getHeaderHandle(),
+                request.getHeaderExample());
         if (header != null) components.add(header);
 
         java.util.Map<String, Object> bodyComponent = new java.util.LinkedHashMap<>();
@@ -254,7 +260,8 @@ public class WhatsAppTemplateService {
      * actual image. That is why a media header needs a handle and a TEXT one
      * does not.
      */
-    private java.util.Map<String, Object> headerComponent(String format, String text, String handle) {
+    private java.util.Map<String, Object> headerComponent(String format, String text, String handle,
+                                                          String example) {
         String fmt = format == null || format.isBlank() ? "TEXT" : format.trim().toUpperCase();
         if ("NONE".equals(fmt)) return null;
 
@@ -263,7 +270,22 @@ public class WhatsAppTemplateService {
             if (text.trim().length() > 60) {
                 throw new BadRequestException("Header text cannot be longer than 60 characters");
             }
-            return java.util.Map.of("type", "HEADER", "format", "TEXT", "text", text.trim());
+            int vars = variableCountOf(text);
+            if (vars == 0) {
+                return java.util.Map.of("type", "HEADER", "format", "TEXT", "text", text.trim());
+            }
+            // Meta allows a single variable in a text header, and wants a sample for it.
+            checkVariables("The header", text, false);
+            if (vars > 1) throw new BadRequestException("A text header can have only one variable, {{1}}");
+            if (example == null || example.isBlank()) {
+                throw new BadRequestException("The header uses {{1}} — give an example value for it");
+            }
+            java.util.Map<String, Object> node = new java.util.LinkedHashMap<>();
+            node.put("type", "HEADER");
+            node.put("format", "TEXT");
+            node.put("text", text.trim());
+            node.put("example", java.util.Map.of("header_text", List.of(example.trim())));
+            return node;
         }
         if (!List.of("IMAGE", "VIDEO", "DOCUMENT").contains(fmt)) {
             throw new BadRequestException("Header format must be TEXT, IMAGE, VIDEO, DOCUMENT or NONE");
@@ -381,6 +403,7 @@ public class WhatsAppTemplateService {
             if (card.getBodyText() == null || card.getBodyText().isBlank()) {
                 throw new BadRequestException("Carousel card " + (index + 1) + " needs body text");
             }
+            checkVariables("Carousel card " + (index + 1) + " body", card.getBodyText(), true);
             if (card.getHeaderHandle() == null || card.getHeaderHandle().isBlank()) {
                 throw new BadRequestException(
                         "Carousel card " + (index + 1) + " needs a sample image — upload one first");
@@ -422,6 +445,34 @@ public class WhatsAppTemplateService {
             throw new BadRequestException("Carousel cards can only use an IMAGE or VIDEO header");
         }
         return fmt;
+    }
+
+    /**
+     * Meta's rules for variables, checked before submitting because its own
+     * rejection only says the template is invalid: numbered {{1}}, {{2}}…
+     * with no gaps, never two side by side, and — in a body — not at the very
+     * start or end of the text.
+     */
+    static void checkVariables(String where, String text, boolean noEdges) {
+        if (text == null) return;
+        java.util.regex.Matcher m = java.util.regex.Pattern.compile("\\{\\{(\\d+)}}").matcher(text);
+        java.util.Set<Integer> seen = new java.util.TreeSet<>();
+        while (m.find()) seen.add(Integer.parseInt(m.group(1)));
+        if (seen.isEmpty()) return;
+        int max = java.util.Collections.max(seen);
+        for (int i = 1; i <= max; i++) {
+            if (!seen.contains(i)) {
+                throw new BadRequestException(where + " variables must be numbered {{1}}, {{2}}… with no gaps — {{"
+                        + i + "}} is missing");
+            }
+        }
+        String trimmed = text.trim();
+        if (noEdges && (trimmed.startsWith("{{") || trimmed.endsWith("}}"))) {
+            throw new BadRequestException(where + " can't start or end with a variable — add some words around it");
+        }
+        if (java.util.regex.Pattern.compile("}}\\s*\\{\\{").matcher(text).find()) {
+            throw new BadRequestException(where + " has two variables side by side — put some text between them");
+        }
     }
 
     static int variableCountOf(String text) {

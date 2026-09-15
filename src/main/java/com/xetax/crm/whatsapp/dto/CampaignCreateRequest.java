@@ -26,4 +26,11 @@ public class CampaignCreateRequest {
 
     /** Payload keys mapped in order to the template's {{1}},{{2}}… variables. */
     private List<String> templateParams = new ArrayList<>();
+
+    /**
+     * Field keys (RECORDS) or CSV column names for every variable of the
+     * template, in its shape. Supersedes templateParams, which only covered the body.
+     * A header / card media link here is used as-is, not looked up.
+     */
+    private TemplateVariables templateVariables;
 }

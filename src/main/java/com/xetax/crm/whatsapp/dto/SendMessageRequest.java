@@ -16,6 +16,12 @@ public class SendMessageRequest {
     private String templateName;
     private String templateLanguage;
     private String componentsJson;
+    /**
+     * Values for the template's variables. When componentsJson is not given,
+     * the send builds it from these and the synced template, checking that
+     * every variable has exactly one value.
+     */
+    private TemplateVariables templateVariables;
     /** JSON array of up to 3 quick-reply button labels — makes the send INTERACTIVE. */
     private String buttonsJson;
 }
