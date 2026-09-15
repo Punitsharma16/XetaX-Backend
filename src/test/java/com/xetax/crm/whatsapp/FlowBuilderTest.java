@@ -38,13 +38,15 @@ class FlowBuilderTest {
     }
 
     @Test
-    void oneTerminalScreenHoldsTheWholeForm() throws Exception {
+    void aShortFormStaysOnOneTerminalScreen() throws Exception {
         JsonNode flow = build(List.of(
                 field("name", "Your name", FieldType.TEXT, true),
                 field("EMAIL", "Email", FieldType.EMAIL, false)));
 
         assertEquals("7.0", flow.path("version").asText());
         assertEquals(1, flow.path("screens").size());
+        assertTrue(flow.path("routing_model").isMissingNode(),
+                "a single screen needs no routing model");
 
         JsonNode screen = flow.path("screens").get(0);
         assertEquals("FIRST_ENTRY_SCREEN", screen.path("id").asText());
@@ -126,6 +128,80 @@ class FlowBuilderTest {
         // heading + one control + footer
         assertEquals(3, children.size());
         assertEquals("name", children.get(1).path("name").asText());
+    }
+
+    @Test
+    void aLongFormIsSplitAcrossScreensThatChainTogether() throws Exception {
+        java.util.List<FieldResponse> many = new java.util.ArrayList<>();
+        for (int i = 1; i <= 13; i++) {
+            many.add(field("f" + i, "Question " + i, FieldType.TEXT, false));
+        }
+        JsonNode flow = build(many);
+
+        assertEquals(3, flow.path("screens").size(), "13 questions across 6 per screen");
+        assertEquals("FIRST_ENTRY_SCREEN", flow.path("screens").get(0).path("id").asText());
+        assertEquals("SCREEN_1", flow.path("screens").get(1).path("id").asText());
+        assertEquals("SCREEN_2", flow.path("screens").get(2).path("id").asText());
+
+        // routing model names where each screen may go
+        JsonNode routing = flow.path("routing_model");
+        assertEquals("SCREEN_1", routing.path("FIRST_ENTRY_SCREEN").get(0).asText());
+        assertEquals("SCREEN_2", routing.path("SCREEN_1").get(0).asText());
+        assertEquals(0, routing.path("SCREEN_2").size(), "the last screen goes nowhere");
+
+        // only the last screen is terminal
+        assertTrue(flow.path("screens").get(0).path("terminal").isMissingNode());
+        assertTrue(flow.path("screens").get(2).path("terminal").asBoolean());
+    }
+
+    @Test
+    void earlierAnswersAreCarriedForwardToTheFinalSubmit() throws Exception {
+        java.util.List<FieldResponse> many = new java.util.ArrayList<>();
+        for (int i = 1; i <= 13; i++) {
+            many.add(field("f" + i, "Question " + i, FieldType.TEXT, false));
+        }
+        JsonNode flow = build(many);
+
+        JsonNode firstFooter = footerOf(flow.path("screens").get(0));
+        assertEquals("navigate", firstFooter.path("on-click-action").path("name").asText());
+        assertEquals("SCREEN_1",
+                firstFooter.path("on-click-action").path("next").path("name").asText());
+        assertEquals("${form.f1}",
+                firstFooter.path("on-click-action").path("payload").path("f1").asText());
+
+        // screen two passes screen one's answers on as data, plus its own
+        JsonNode secondFooter = footerOf(flow.path("screens").get(1));
+        JsonNode secondPayload = secondFooter.path("on-click-action").path("payload");
+        assertEquals("${data.f1}", secondPayload.path("f1").asText(),
+                "an answer from an earlier screen travels as data");
+        assertEquals("${form.f7}", secondPayload.path("f7").asText());
+        assertTrue(flow.path("screens").get(1).path("data").has("f1"),
+                "the screen declares the data it receives");
+
+        // the last screen submits everything
+        JsonNode lastFooter = footerOf(flow.path("screens").get(2));
+        assertEquals("complete", lastFooter.path("on-click-action").path("name").asText());
+        JsonNode finalPayload = lastFooter.path("on-click-action").path("payload");
+        for (int i = 1; i <= 13; i++) {
+            assertTrue(finalPayload.has("f" + i), "f" + i + " reaches the final submit");
+        }
+    }
+
+    @Test
+    void aFormTooLongForWhatsAppIsRefusedInsteadOfLosingQuestions() {
+        java.util.List<FieldResponse> tooMany = new java.util.ArrayList<>();
+        for (int i = 1; i <= 60; i++) {
+            tooMany.add(field("f" + i, "Question " + i, FieldType.TEXT, false));
+        }
+        BadRequestException error = assertThrows(BadRequestException.class,
+                () -> builder.buildFromFields("Long form", tooMany));
+        assertTrue(error.getMessage().contains("screens"));
+    }
+
+    /** The Footer is always the last child of a screen's Form. */
+    private JsonNode footerOf(JsonNode screen) {
+        JsonNode children = screen.path("layout").path("children").get(0).path("children");
+        return children.get(children.size() - 1);
     }
 
     @Test
