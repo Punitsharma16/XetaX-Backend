@@ -50,7 +50,8 @@ class WhatsAppWebhookProcessorTest {
                 recipientRepository,
                 mock(WhatsAppMessagingService.class),
                 new ObjectMapper(),
-                new io.micrometer.core.instrument.simple.SimpleMeterRegistry());
+                new io.micrometer.core.instrument.simple.SimpleMeterRegistry(),
+                mock(com.xetax.crm.whatsapp.service.WhatsAppMediaService.class));
 
         message = WhatsAppMessage.builder()
                 .ownerUserId("u1")

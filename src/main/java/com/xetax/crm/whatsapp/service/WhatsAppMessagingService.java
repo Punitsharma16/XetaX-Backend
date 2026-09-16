@@ -54,6 +54,7 @@ public class WhatsAppMessagingService {
     private final MeterRegistry meterRegistry;
     private final WhatsAppTemplateRepository templateRepository;
     private final WhatsAppTemplateVariables templateVariables;
+    private final WhatsAppMediaService mediaService;
 
     /** Meta's customer-service window: free text only within 24h of the last inbound. */
     private static final java.time.Duration SERVICE_WINDOW = java.time.Duration.ofHours(24);
@@ -73,7 +74,8 @@ public class WhatsAppMessagingService {
                                     @Lazy RecordService recordService,
                                     MeterRegistry meterRegistry,
                                     WhatsAppTemplateRepository templateRepository,
-                                    WhatsAppTemplateVariables templateVariables) {
+                                    WhatsAppTemplateVariables templateVariables,
+                                    WhatsAppMediaService mediaService) {
         this.messageRepository = messageRepository;
         this.conversationRepository = conversationRepository;
         this.configRepository = configRepository;
@@ -86,6 +88,7 @@ public class WhatsAppMessagingService {
         this.meterRegistry = meterRegistry;
         this.templateRepository = templateRepository;
         this.templateVariables = templateVariables;
+        this.mediaService = mediaService;
     }
 
     /** True when a free-form text may be sent to this phone (24h window open). */
@@ -145,7 +148,7 @@ public class WhatsAppMessagingService {
 
         // For INTERACTIVE the buttons ride the same side-channel templates use.
         dispatchAsync(message.getId(), interactive ? request.getButtonsJson() : componentsJson);
-        return toResponse(message);
+        return toResponse(message, mediaService.publicUrl(message));
     }
 
     /**
@@ -208,7 +211,7 @@ public class WhatsAppMessagingService {
         message.setMediaId(mediaId);
         messageRepository.save(message);
         dispatchAsync(message.getId(), null);
-        return toResponse(message);
+        return toResponse(message, mediaService.publicUrl(message));
     }
 
     /** Automation path — runs without a security context, scoped by form owner. */
@@ -321,7 +324,7 @@ public class WhatsAppMessagingService {
     public List<WhatsAppMessageResponse> recordHistory(String recordId) {
         String owner = configService.currentUserId();
         return messageRepository.findTop50ByRecordIdAndOwnerUserIdOrderByIdDesc(recordId, owner)
-                .stream().map(WhatsAppMessagingService::toResponse).toList();
+                .stream().map(m -> toResponse(m, mediaService.publicUrl(m))).toList();
     }
 
     /* --------------------------------------------------------- persistence */
@@ -633,7 +636,8 @@ public class WhatsAppMessagingService {
                 flowToken, request.getCtaText(), body,
                 request.getHeaderText(), request.getFooterText());
         applySendResult(message.getId(), result);
-        return toResponse(reload(message.getId()));
+        WhatsAppMessage saved = reload(message.getId());
+        return toResponse(saved, mediaService.publicUrl(saved));
     }
 
     /* ------------------------------------------------------------- helpers */
@@ -676,13 +680,22 @@ public class WhatsAppMessagingService {
         return preview.length() > 500 ? preview.substring(0, 500) : preview;
     }
 
-    public static WhatsAppMessageResponse toResponse(WhatsAppMessage message) {
+    /**
+     * The wire shape of one message. mediaUrl is passed in rather than looked
+     * up here because it is built from configuration (the public API host),
+     * which a static mapper cannot read — see WhatsAppMediaService#publicUrl.
+     */
+    public static WhatsAppMessageResponse toResponse(WhatsAppMessage message, String mediaUrl) {
         return WhatsAppMessageResponse.builder()
                 .id(message.getId())
                 .conversationId(message.getConversationId())
                 .direction(message.getDirection().name())
                 .messageType(message.getMessageType().name())
                 .body(message.getBody())
+                .mediaUrl(mediaUrl)
+                .mediaMimeType(message.getMediaMimeType())
+                .mediaFilename(message.getMediaFilename())
+                .mediaSize(message.getMediaSize())
                 .templateName(message.getTemplateName())
                 .toPhone(message.getToPhone())
                 .status(message.getStatus().name())

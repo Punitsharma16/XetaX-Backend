@@ -399,6 +399,36 @@ public class MetaWhatsAppClient {
     }
 
     /** mediaType: image | video | audio | document. Caption/filename optional. */
+    /**
+     * Inbound media: the id from a webhook → a short-lived Graph URL plus the
+     * file's mime type and size. The URL expires within minutes, so the
+     * download has to follow straight away.
+     */
+    public JsonNode getMediaMetadata(String mediaId, String token) {
+        return get(properties.apiUrl("/" + mediaId), token);
+    }
+
+    /**
+     * Downloads the bytes behind a media URL. The URL is on Meta's CDN but
+     * still needs the workspace's bearer token — which is exactly why these
+     * files cannot be shown to a browser directly.
+     */
+    public byte[] downloadMedia(String url, String token) {
+        try {
+            return restClient.get()
+                    .uri(url)
+                    .header("Authorization", "Bearer " + token)
+                    .retrieve()
+                    .body(byte[].class);
+        } catch (RestClientResponseException e) {
+            throw toProviderException(e);
+        } catch (Exception e) {
+            throw new WhatsAppProviderException("NETWORK",
+                    "Could not download the media from Meta.",
+                    "media download failed: " + e.getMessage());
+        }
+    }
+
     public WhatsAppSendResult sendMediaMessage(String phoneNumberId, String token, String toPhone,
                                                String mediaType, String mediaId,
                                                String caption, String filename) {

@@ -230,6 +230,9 @@ app:
   platform-admin-emails: ${PLATFORM_ADMIN_EMAILS:}
   # Where uploaded documents are stored on disk.
   upload-dir: ${APP_UPLOAD_DIR:./uploads}
+  # Largest inbound WhatsApp file to pull from Meta and keep (25 MB). Anything
+  # bigger stays on Meta: the message still shows, just without a link.
+  whatsapp-media-max-bytes: ${WHATSAPP_MEDIA_MAX_BYTES:26214400}
   # Comma-separated browser origins allowed to call the API (the panel's URL).
   cors-origins: ${APP_CORS_ORIGINS:http://localhost:5000}
   public-base-url: ${APP_PUBLIC_BASE_URL:http://localhost:5000}

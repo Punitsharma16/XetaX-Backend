@@ -50,4 +50,6 @@ public interface WhatsAppMessageRepository extends JpaRepository<WhatsAppMessage
 
     /** Did this thread ever receive a campaign message? (bot scope = CAMPAIGN replies only) */
     boolean existsByConversationIdAndCampaignIdIsNotNull(Long conversationId);
+    /** Public media link → the message that owns the file. */
+    Optional<WhatsAppMessage> findByMediaKey(String mediaKey);
 }

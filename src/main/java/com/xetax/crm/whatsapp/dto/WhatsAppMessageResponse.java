@@ -14,6 +14,11 @@ public class WhatsAppMessageResponse {
     private String direction;
     private String messageType;
     private String body;
+    /** Public, tokenless link to the file — null when the message has none. */
+    private String mediaUrl;
+    private String mediaMimeType;
+    private String mediaFilename;
+    private Long mediaSize;
     private String templateName;
     private String toPhone;
     private String status;

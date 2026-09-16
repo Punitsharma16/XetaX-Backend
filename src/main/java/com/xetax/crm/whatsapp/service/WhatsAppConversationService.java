@@ -19,6 +19,7 @@ public class WhatsAppConversationService {
     private final WhatsAppConversationRepository conversationRepository;
     private final WhatsAppMessageRepository messageRepository;
     private final WhatsAppConfigService configService;
+    private final WhatsAppMediaService mediaService;
 
     public Page<WhatsAppConversationResponse> list(int page, int size) {
         String owner = configService.currentUserId();
@@ -42,7 +43,7 @@ public class WhatsAppConversationService {
         return messageRepository
                 .findByConversationIdAndOwnerUserIdOrderByIdDesc(conversationId, owner,
                         PageRequest.of(Math.max(0, page), Math.min(Math.max(1, size), 100)))
-                .map(WhatsAppMessagingService::toResponse);
+                .map(m -> WhatsAppMessagingService.toResponse(m, mediaService.publicUrl(m)));
     }
 
     private static WhatsAppConversationResponse toResponse(WhatsAppConversation conversation) {

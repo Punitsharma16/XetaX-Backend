@@ -48,6 +48,7 @@ public class OutreachService {
     private final com.xetax.crm.activity.RecordActivityService activityService;
     private final org.springframework.beans.factory.ObjectProvider<com.xetax.crm.data_manager.service.RecordService> recordServiceProvider;
     private final com.xetax.crm.whatsapp.service.WhatsAppTemplateVariables variablesBuilder;
+    private final com.xetax.crm.whatsapp.service.WhatsAppMediaService mediaService;
 
     private String owner() {
         UUID id = currentUserProvider.currentDataOwnerIdOrNull();
@@ -119,6 +120,12 @@ public class OutreachService {
                         row.put("templateName", m.getTemplateName());
                         row.put("status", m.getStatus());
                         row.put("createdAt", m.getCreatedAt());
+                        // Same public link the inbox uses, so a record's chat
+                        // shows the customer's photos and files too.
+                        row.put("mediaUrl", mediaService.publicUrl(m));
+                        row.put("mediaMimeType", m.getMediaMimeType());
+                        row.put("mediaFilename", m.getMediaFilename());
+                        row.put("mediaSize", m.getMediaSize());
                         out.add(row);
                     }
                     Collections.reverse(out); // oldest first — chat order

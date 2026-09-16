@@ -56,6 +56,7 @@ public class WhatsAppWebhookProcessor {
     private final WhatsAppMessagingService messagingService;
     private final ObjectMapper objectMapper;
     private final MeterRegistry meterRegistry;
+    private final com.xetax.crm.whatsapp.service.WhatsAppMediaService mediaService;
 
     public void processRawValue(String valueJson) {
         try {
@@ -206,18 +207,11 @@ public class WhatsAppWebhookProcessor {
                         inbound.path(type).path("id").asText(null);
                 default -> null;
             };
-            String body = switch (type) {
-                case "text" -> inbound.path("text").path("body").asText("");
-                case "button" -> inbound.path("button").path("text").asText("");
-                case "interactive" -> interactiveText(inbound.path("interactive"));
-                case "image", "video", "audio", "document", "sticker" -> {
-                    String caption = inbound.path(type).path("caption").asText("");
-                    yield caption.isBlank() ? "[" + type + "]" : "[" + type + "] " + caption;
-                }
-                case "location" -> "[location] " + inbound.path("location").path("latitude").asText("")
-                        + "," + inbound.path("location").path("longitude").asText("");
-                default -> "[" + type + " message]";
-            };
+            // A document arrives with the name the customer's file had. Keep it:
+            // it is what the thread shows and what the download link serves.
+            String mediaFilename = "document".equals(type)
+                    ? trimmedOrNull(inbound.path("document").path("filename").asText("")) : null;
+            String body = inboundText(type, inbound, mediaFilename);
 
             WhatsAppConversation conversation =
                     messagingService.upsertConversation(config, from, contactName);
@@ -231,11 +225,17 @@ public class WhatsAppWebhookProcessor {
                     .messageType(mapType(type))
                     .body(body)
                     .mediaId(mediaId)
+                    .mediaFilename(mediaFilename)
                     .providerMessageId(wamid)
                     .status(WhatsAppMessageStatus.DELIVERED)
                     .deliveredAt(timestampOf(inbound))
                     .build();
             messageRepository.save(message);
+
+            // Meta hands us an id, not a file, and the download URL behind it
+            // expires within minutes — so fetch it now. The shareable link is
+            // minted by WhatsAppMediaService once the bytes are stored.
+            mediaService.fetchAfterCommit(config, message.getId(), mediaId);
 
             conversation.setLastMessage(body.length() > 500 ? body.substring(0, 500) : body);
             conversation.setLastMessageAt(Instant.now());
@@ -318,14 +318,104 @@ public class WhatsAppWebhookProcessor {
         }
     }
 
+    /**
+     * One readable line for any message Meta can deliver.
+     *
+     * <p>Each branch is a shape a customer can genuinely send. Without them a
+     * thread shows an empty bubble (location, contacts, order) or a blob of
+     * raw JSON. A media message shows its caption when there is one, because
+     * the file itself now travels alongside as a link — the bracketed label is
+     * only the fallback for a caption-less file.
+     */
+    private String inboundText(String type, JsonNode inbound, String mediaFilename) {
+        return switch (type) {
+            case "text" -> inbound.path("text").path("body").asText("");
+            case "button" -> inbound.path("button").path("text").asText("");
+            case "interactive" -> interactiveText(inbound.path("interactive"));
+            case "image" -> captionOr(inbound.path("image"), "[photo]");
+            case "video" -> captionOr(inbound.path("video"), "[video]");
+            case "audio" -> inbound.path("audio").path("voice").asBoolean(false)
+                    ? "[voice message]" : "[audio]";
+            case "sticker" -> "[sticker]";
+            case "document" -> {
+                String caption = inbound.path("document").path("caption").asText("");
+                if (!caption.isBlank()) yield caption;
+                yield mediaFilename == null ? "[document]" : mediaFilename;
+            }
+            case "location" -> locationText(inbound.path("location"));
+            case "contacts" -> contactsText(inbound.path("contacts"));
+            case "reaction" -> reactionText(inbound.path("reaction"));
+            case "order" -> orderText(inbound.path("order"));
+            case "system" -> {
+                String systemBody = inbound.path("system").path("body").asText("");
+                yield systemBody.isBlank() ? "[system message]" : systemBody;
+            }
+            case "unsupported" -> {
+                String reason = inbound.path("errors").path(0).path("title").asText("");
+                yield reason.isBlank() ? "[unsupported message]" : "[unsupported] " + reason;
+            }
+            default -> "[" + type + " message]";
+        };
+    }
+
+    private static String captionOr(JsonNode media, String fallback) {
+        String caption = media.path("caption").asText("");
+        return caption.isBlank() ? fallback : caption;
+    }
+
+    /** A pin shows its place when the customer named one, else its coordinates. */
+    private static String locationText(JsonNode location) {
+        String name = location.path("name").asText("");
+        String address = location.path("address").asText("");
+        String where = !name.isBlank() && !address.isBlank() ? name + ", " + address
+                : !name.isBlank() ? name
+                : !address.isBlank() ? address
+                : location.path("latitude").asText("") + "," + location.path("longitude").asText("");
+        return "[location] " + where;
+    }
+
+    /** A shared contact card: the names on it, not the vCard. */
+    private static String contactsText(JsonNode contacts) {
+        StringBuilder names = new StringBuilder();
+        for (JsonNode contact : contacts) {
+            String name = contact.path("name").path("formatted_name").asText("");
+            if (name.isBlank()) continue;
+            if (!names.isEmpty()) names.append(", ");
+            names.append(name);
+        }
+        return names.isEmpty() ? "[contact]" : "[contact] " + names;
+    }
+
+    /** An emoji reaction to an earlier message; an empty emoji means removed. */
+    private static String reactionText(JsonNode reaction) {
+        String emoji = reaction.path("emoji").asText("");
+        return emoji.isBlank() ? "[reaction removed]" : "Reacted " + emoji;
+    }
+
+    /** A cart sent from a catalogue. */
+    private static String orderText(JsonNode order) {
+        int items = order.path("product_items").size();
+        return items == 0 ? "[order]" : "[order] " + items + (items == 1 ? " item" : " items");
+    }
+
+    private static String trimmedOrNull(String value) {
+        return value == null || value.isBlank() ? null : value.trim();
+    }
+
     private WhatsAppMessageType mapType(String type) {
         return switch (type) {
             case "image" -> WhatsAppMessageType.IMAGE;
             case "document" -> WhatsAppMessageType.DOCUMENT;
             case "video" -> WhatsAppMessageType.VIDEO;
             case "audio" -> WhatsAppMessageType.AUDIO;
+            case "sticker" -> WhatsAppMessageType.STICKER;
             case "interactive", "button" -> WhatsAppMessageType.INTERACTIVE;
             case "reaction" -> WhatsAppMessageType.REACTION;
+            case "location" -> WhatsAppMessageType.LOCATION;
+            case "contacts" -> WhatsAppMessageType.CONTACTS;
+            case "order" -> WhatsAppMessageType.ORDER;
+            case "system" -> WhatsAppMessageType.SYSTEM;
+            case "unsupported" -> WhatsAppMessageType.UNSUPPORTED;
             default -> WhatsAppMessageType.TEXT;
         };
     }

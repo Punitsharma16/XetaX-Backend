@@ -21,7 +21,8 @@ import java.time.Instant;
         indexes = {
                 @Index(name = "idx_wa_msg_conv", columnList = "conversation_id"),
                 @Index(name = "idx_wa_msg_owner", columnList = "owner_user_id"),
-                @Index(name = "idx_wa_msg_campaign", columnList = "campaign_id")
+                @Index(name = "idx_wa_msg_campaign", columnList = "campaign_id"),
+                @Index(name = "idx_wa_msg_media_key", columnList = "media_key")
         })
 @Getter
 @Setter
@@ -63,6 +64,27 @@ public class WhatsAppMessage extends BaseEntity {
     /** Meta media id for inbound IMAGE/VIDEO/AUDIO/DOCUMENT messages. */
     @Column(name = "media_id", length = 128)
     private String mediaId;
+
+    /**
+     * Unguessable key in the file's public link. Null until the bytes have
+     * been pulled from Meta and stored — see WhatsAppMediaService.
+     */
+    @Column(name = "media_key", length = 64)
+    private String mediaKey;
+
+    /** Absolute path of the downloaded copy on this server. */
+    @Column(name = "media_storage_path", length = 512)
+    private String mediaStoragePath;
+
+    @Column(name = "media_mime_type", length = 128)
+    private String mediaMimeType;
+
+    /** The name the customer's file had, for documents. */
+    @Column(name = "media_filename", length = 255)
+    private String mediaFilename;
+
+    @Column(name = "media_size")
+    private Long mediaSize;
 
     @Column(length = 255)
     private String templateName;
