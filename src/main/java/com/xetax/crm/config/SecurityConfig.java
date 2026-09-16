@@ -79,6 +79,7 @@ public class SecurityConfig {
                                 "/api/public/meetings/**",
                                 "/api/public/agents/**",
                                 "/api/public/forms/**",
+                                "/api/public/menu/**",
                                 "/ws/**",
                                 "/actuator/health", "/actuator/health/**",
                                 "/v3/api-docs/**",

@@ -51,6 +51,7 @@ public class JwtAuthenticationFilter extends OncePerRequestFilter {
             "/api/public/whatsapp/",
             "/api/public/meetings/",
             "/api/public/agents/",
+            "/api/public/menu/",
             "/ws/",
             "/actuator",
             "/v3/api-docs",
