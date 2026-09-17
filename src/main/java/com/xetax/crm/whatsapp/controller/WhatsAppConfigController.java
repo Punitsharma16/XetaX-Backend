@@ -15,6 +15,7 @@ import com.xetax.crm.whatsapp.service.WhatsAppTemplateService;
 import com.xetax.crm.whatsapp.service.WhatsAppUsageService;
 import lombok.RequiredArgsConstructor;
 import org.springframework.web.bind.annotation.*;
+import org.springframework.web.multipart.MultipartFile;
 
 import java.util.List;
 import java.util.Map;
@@ -94,7 +95,7 @@ public class WhatsAppConfigController {
     @PostMapping("/templates/sample")
     @RequiresPermission("whatsapp.manage")
     public ApiResponse<java.util.Map<String, String>> uploadTemplateSample(
-            @RequestParam("file") org.springframework.web.multipart.MultipartFile file) {
+            @RequestParam("file") MultipartFile file) {
         try {
             String handle = templateService.uploadSample(
                     file.getBytes(), file.getOriginalFilename(), file.getContentType());

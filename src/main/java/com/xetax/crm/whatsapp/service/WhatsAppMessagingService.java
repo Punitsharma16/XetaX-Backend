@@ -55,6 +55,7 @@ public class WhatsAppMessagingService {
     private final WhatsAppTemplateRepository templateRepository;
     private final WhatsAppTemplateVariables templateVariables;
     private final WhatsAppMediaService mediaService;
+    private final TemplateFlowTokens flowTokens;
 
     /** Meta's customer-service window: free text only within 24h of the last inbound. */
     private static final java.time.Duration SERVICE_WINDOW = java.time.Duration.ofHours(24);
@@ -75,7 +76,8 @@ public class WhatsAppMessagingService {
                                     MeterRegistry meterRegistry,
                                     WhatsAppTemplateRepository templateRepository,
                                     WhatsAppTemplateVariables templateVariables,
-                                    WhatsAppMediaService mediaService) {
+                                    WhatsAppMediaService mediaService,
+                                    TemplateFlowTokens flowTokens) {
         this.messageRepository = messageRepository;
         this.conversationRepository = conversationRepository;
         this.configRepository = configRepository;
@@ -89,6 +91,7 @@ public class WhatsAppMessagingService {
         this.templateRepository = templateRepository;
         this.templateVariables = templateVariables;
         this.mediaService = mediaService;
+        this.flowTokens = flowTokens;
     }
 
     /** True when a free-form text may be sent to this phone (24h window open). */
@@ -416,10 +419,15 @@ public class WhatsAppMessagingService {
                 && message.getMessageType() != WhatsAppMessageType.TEMPLATE;
         WhatsAppSendResult result;
         if (message.getMessageType() == WhatsAppMessageType.TEMPLATE) {
+            String withMedia = withHeaderMedia(config, message.getTemplateName(),
+                    message.getTemplateLanguage(), componentsJson);
+            // Flow buttons need a token of their own, or the answers cannot be traced.
+            TemplateFlowTokens.Attached flows = flowTokens.attach(
+                    findTemplate(config, message.getTemplateName(), message.getTemplateLanguage()),
+                    message, withMedia);
             result = sender.sendTemplate(config, message.getToPhone(), message.getTemplateName(),
-                    message.getTemplateLanguage(),
-                    withHeaderMedia(config, message.getTemplateName(),
-                            message.getTemplateLanguage(), componentsJson));
+                    message.getTemplateLanguage(), flows.componentsJson());
+            if (!result.success()) flowTokens.markUndelivered(flows.pendingIds(), result.errorMessage());
         } else if (isMedia) {
             String caption = message.getBody() == null ? null
                     : message.getBody().replaceFirst("^\\[[a-z]+\\]\\s*", "");
@@ -506,6 +514,12 @@ public class WhatsAppMessagingService {
      * <p>If the template has no media header, or no file was stored, the
      * caller's own components are passed through untouched.
      */
+    private WhatsAppTemplate findTemplate(WhatsAppConfig config, String templateName, String language) {
+        if (templateName == null || templateName.isBlank()) return null;
+        return templateRepository.findByWhatsappConfigIdAndNameAndLanguage(config.getId(), templateName,
+                language == null || language.isBlank() ? "en" : language).orElse(null);
+    }
+
     private String withHeaderMedia(WhatsAppConfig config, String templateName,
                                    String language, String componentsJson) {
         if (templateName == null || templateName.isBlank()) return componentsJson;

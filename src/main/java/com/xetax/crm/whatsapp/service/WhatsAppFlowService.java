@@ -273,14 +273,23 @@ public class WhatsAppFlowService {
                                  Long conversationId, String responseJson) {
         Map<String, Object> answers = readAnswers(responseJson);
 
-        WhatsAppFlowResponse row = flowToken == null ? null
-                : responseRepository.findByFlowToken(flowToken).orElse(null);
+        // Only a token we minted names one send. Anything else — Meta's
+        // "unused" for a send that carried no token, or a Flow built outside
+        // XetaX — is shared by many customers, so reusing its row would
+        // overwrite one customer's answers with the next one's.
+        boolean ours = flowToken != null && flowToken.startsWith("flw_");
+        WhatsAppFlowResponse row = ours
+                ? responseRepository.findByFlowToken(flowToken)
+                        .filter(existing -> Objects.equals(existing.getOwnerUserId(), ownerUserId))
+                        .orElse(null)
+                : null;
         if (row == null) {
             row = WhatsAppFlowResponse.builder()
                     .ownerUserId(ownerUserId)
                     .flowToken(flowToken)
                     .customerPhone(customerPhone)
                     .conversationId(conversationId)
+                    .flowId(ours ? flowIdOf(flowToken, ownerUserId) : null)
                     .build();
         }
         row.setCustomerPhone(customerPhone != null ? customerPhone : row.getCustomerPhone());
@@ -303,6 +312,21 @@ public class WhatsAppFlowService {
             log.warn("Flow {} submission could not create a record: {}", flow.getId(), e.getMessage());
         }
         responseRepository.save(row);
+    }
+
+    /** Our tokens read flw_{flowId}_{random}; the Flow must still belong to this workspace. */
+    private Long flowIdOf(String flowToken, String ownerUserId) {
+        String[] parts = flowToken.split("_");
+        if (parts.length < 3) return null;
+        try {
+            Long id = Long.parseLong(parts[1]);
+            return flowRepository.findById(id)
+                    .filter(flow -> Objects.equals(flow.getOwnerUserId(), ownerUserId))
+                    .map(WhatsAppFlow::getId)
+                    .orElse(null);
+        } catch (NumberFormatException e) {
+            return null;
+        }
     }
 
     public Page<FlowResponseView> responses(Long flowId, int page, int size) {

@@ -10,6 +10,7 @@ import org.springframework.util.LinkedMultiValueMap;
 import org.springframework.util.MultiValueMap;
 import org.springframework.web.client.RestClient;
 import org.springframework.web.client.RestClientResponseException;
+import org.springframework.web.util.UriComponentsBuilder;
 
 import java.util.ArrayList;
 import java.util.HashMap;
@@ -140,11 +141,16 @@ public class MetaWhatsAppClient {
                     "META_APP_ID / META_APP_SECRET missing");
         }
         try {
-            String sessionUri = properties.apiUrl("/" + properties.getAppId() + "/uploads")
-                    + "?file_name=" + java.net.URLEncoder.encode(
-                            filename == null ? "sample" : filename, java.nio.charset.StandardCharsets.UTF_8)
-                    + "&file_length=" + bytes.length
-                    + "&file_type=" + java.net.URLEncoder.encode(mimeType, java.nio.charset.StandardCharsets.UTF_8);
+            String sessionUri = UriComponentsBuilder
+                    .fromUriString(properties.apiUrl("/" + properties.getAppId() + "/uploads"))
+                    .queryParam("file_name", filename == null ? "sample" : filename)
+                    .queryParam("file_length", bytes.length)
+                    .queryParam("file_type", mimeType)
+                    .build()
+                    .encode()
+                    .toUriString();
+
+            System.out.println("sessionUri = " + sessionUri);
 
             String sessionBody = restClient.post()
                     .uri(sessionUri)
