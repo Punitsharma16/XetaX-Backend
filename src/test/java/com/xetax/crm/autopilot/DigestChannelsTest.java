@@ -122,15 +122,84 @@ class DigestChannelsTest {
         verify(notifications, never()).push(anyString(), anyString(), anyString(), anyString(), anyString(), anyString());
     }
 
-    @Test
-    void anOwnerWhoNeverSavedGetsEverythingOn() {
+    /* ------------------------------------------- defaults for owners who never saved */
+
+    private DigestPreferenceService serviceFor(java.time.Instant accountCreated) {
         DigestPreferenceRepository repository = mock(DigestPreferenceRepository.class);
         when(repository.findByOwnerUserId(OWNER)).thenReturn(Optional.empty());
-        DigestPreferenceService real = new DigestPreferenceService(repository, null, null, null, null);
+        AuthUserRepository users = mock(AuthUserRepository.class);
+        if (accountCreated != null) {
+            AuthUserEntity user = new AuthUserEntity();
+            user.setCreateAt(accountCreated);
+            when(users.findById(UUID.fromString(OWNER))).thenReturn(Optional.of(user));
+        } else {
+            when(users.findById(any())).thenReturn(Optional.empty());
+        }
+        DigestPreferenceService real = new DigestPreferenceService(repository, null, null, users, null);
+        org.springframework.test.util.ReflectionTestUtils.setField(real, "whatsappOffFrom", "2026-09-18");
+        return real;
+    }
 
-        DigestPreferenceService.Channels c = real.forOwner(OWNER);
+    @Test
+    void anOlderAccountThatNeverSavedKeepsEverythingOn() {
+        DigestPreferenceService.Channels c = serviceFor(java.time.Instant.parse("2026-08-01T10:00:00Z")).forOwner(OWNER);
         assertTrue(c.enabled());
         assertTrue(c.emailEnabled());
-        assertTrue(c.whatsappEnabled());
+        assertTrue(c.whatsappEnabled(), "nobody's WhatsApp digest disappears without them choosing it");
+    }
+
+    @Test
+    void aNewAccountStartsWithTheWhatsAppDigestOff() {
+        // Midnight on the cut-off date in India counts as new.
+        DigestPreferenceService.Channels c = serviceFor(java.time.Instant.parse("2026-09-17T18:30:00Z")).forOwner(OWNER);
+        assertTrue(c.enabled(), "the digest itself still runs — the bell always gets it");
+        assertTrue(c.emailEnabled());
+        assertFalse(c.whatsappEnabled(), "a paid message is opt-in for new accounts");
+    }
+
+    @Test
+    void anAccountThatCannotBeFoundKeepsTheOldBehaviour() {
+        assertTrue(serviceFor(null).forOwner(OWNER).whatsappEnabled());
+    }
+
+    @Test
+    void aSavedChoiceAlwaysWins() {
+        DigestPreferenceRepository repository = mock(DigestPreferenceRepository.class);
+        when(repository.findByOwnerUserId(OWNER)).thenReturn(Optional.of(
+                com.xetax.crm.settings.entity.DigestPreference.builder()
+                        .ownerUserId(OWNER).enabled(true).emailEnabled(false).whatsappEnabled(true).build()));
+        DigestPreferenceService real = new DigestPreferenceService(repository, null, null, mock(AuthUserRepository.class), null);
+        org.springframework.test.util.ReflectionTestUtils.setField(real, "whatsappOffFrom", "2026-09-18");
+
+        DigestPreferenceService.Channels c = real.forOwner(OWNER);
+        assertFalse(c.emailEnabled());
+        assertTrue(c.whatsappEnabled(), "a new account that switched WhatsApp on keeps it on");
+    }
+
+    @Test
+    void aFirstSaveStartsFromWhatTheOwnerCurrentlyGets() {
+        DigestPreferenceRepository repository = mock(DigestPreferenceRepository.class);
+        when(repository.findByOwnerUserId(OWNER)).thenReturn(Optional.empty());
+        AuthUserRepository users = mock(AuthUserRepository.class);
+        AuthUserEntity user = new AuthUserEntity();
+        user.setCreateAt(java.time.Instant.parse("2026-09-20T10:00:00Z"));
+        when(users.findById(UUID.fromString(OWNER))).thenReturn(Optional.of(user));
+        com.xetax.crm.auth.security.CurrentUserProvider me = mock(com.xetax.crm.auth.security.CurrentUserProvider.class);
+        when(me.currentUserIdOrNull()).thenReturn(UUID.fromString(OWNER));
+        when(me.currentDataOwnerIdOrNull()).thenReturn(UUID.fromString(OWNER));
+        OrgSmtpService smtp = mock(OrgSmtpService.class);
+        WhatsAppMessagingService wa = mock(WhatsAppMessagingService.class);
+        when(wa.connectedConfig(anyString())).thenReturn(Optional.empty());
+        DigestPreferenceService real = new DigestPreferenceService(repository, me, smtp, users, wa);
+        org.springframework.test.util.ReflectionTestUtils.setField(real, "whatsappOffFrom", "2026-09-18");
+
+        // The owner only turns email off; WhatsApp must stay as it was (off, for a new account).
+        real.save(null, false, null);
+
+        var captor = org.mockito.ArgumentCaptor.forClass(com.xetax.crm.settings.entity.DigestPreference.class);
+        verify(repository).save(captor.capture());
+        assertTrue(captor.getValue().isEnabled());
+        assertFalse(captor.getValue().isEmailEnabled());
+        assertFalse(captor.getValue().isWhatsappEnabled(), "saving email must not switch a paid channel on");
     }
 }

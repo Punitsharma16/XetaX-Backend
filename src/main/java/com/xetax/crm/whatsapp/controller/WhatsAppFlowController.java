@@ -82,6 +82,13 @@ public class WhatsAppFlowController {
         return ResponseUtil.success("Flow sent", flowService.send(request));
     }
 
+    /** Creates the record again for a submission whose record failed. */
+    @PostMapping("/responses/{id}/record")
+    @RequiresPermission("whatsapp.inbox")
+    public ApiResponse<FlowResponseView> retryRecord(@PathVariable Long id) {
+        return ResponseUtil.success("Record retried", flowService.retryRecord(id));
+    }
+
     /** Submissions, newest first. Omit flowId for everything the workspace got. */
     @GetMapping("/responses")
     @RequiresPermission("whatsapp.view")

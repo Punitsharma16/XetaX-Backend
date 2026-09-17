@@ -230,6 +230,14 @@ app:
   platform-admin-emails: ${PLATFORM_ADMIN_EMAILS:}
   # Where uploaded documents are stored on disk.
   upload-dir: ${APP_UPLOAD_DIR:./uploads}
+  # Accounts opened on/after this date start with the WhatsApp morning digest
+  # off (Meta charges for every business message from 1 Oct 2026). Older
+  # accounts keep the digest they always had.
+  digest-whatsapp-off-for-accounts-from: ${DIGEST_WHATSAPP_OFF_FROM:2026-09-18}
+  # WhatsApp charge estimate: Meta's month starts at midnight in the WABA's zone.
+  whatsapp-billing-zone: ${WHATSAPP_BILLING_ZONE:Asia/Kolkata}
+  # Service messages Meta does not charge each month. 0 until Meta confirms one.
+  whatsapp-free-service-per-month: ${WHATSAPP_FREE_SERVICE_PER_MONTH:0}
   # Largest inbound WhatsApp file to pull from Meta and keep (25 MB). Anything
   # bigger stays on Meta: the message still shows, just without a link.
   whatsapp-media-max-bytes: ${WHATSAPP_MEDIA_MAX_BYTES:26214400}

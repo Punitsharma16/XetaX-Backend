@@ -19,6 +19,7 @@ public class PlatformController {
 
     private final PlatformService service;
     private final PlatformAdminGuard guard;
+    private final com.xetax.crm.whatsapp.pricing.WhatsAppRateService rateService;
 
     /** Cheap check the panel uses to decide whether to show the console at all. */
     @GetMapping("/me")
@@ -69,6 +70,29 @@ public class PlatformController {
                                                              @RequestBody Map<String, Boolean> body) {
         boolean value = body != null && Boolean.TRUE.equals(body.get("value"));
         return ResponseUtil.success("Updated", service.setPlatformAdmin(userId, value));
+    }
+
+    /* -------------------------------------------- WhatsApp rate card (India) */
+
+    @GetMapping("/whatsapp-rates")
+    public ApiResponse<List<Map<String, Object>>> whatsappRates() {
+        guard.require();
+        return ResponseUtil.success("Rates", rateService.list());
+    }
+
+    /** body: {"category":"MARKETING","rate":0.8631,"effectiveFrom":"2026-10-01","note":"..."} */
+    @PostMapping("/whatsapp-rates")
+    public ApiResponse<Map<String, Object>> saveWhatsappRate(
+            @RequestBody com.xetax.crm.whatsapp.pricing.WhatsAppRateService.RateInput body) {
+        guard.require();
+        return ResponseUtil.success("Rate saved", rateService.upsert(body));
+    }
+
+    @DeleteMapping("/whatsapp-rates/{id}")
+    public ApiResponse<Void> deleteWhatsappRate(@PathVariable Long id) {
+        guard.require();
+        rateService.delete(id);
+        return ResponseUtil.success("Rate deleted");
     }
 
     @GetMapping("/plans")

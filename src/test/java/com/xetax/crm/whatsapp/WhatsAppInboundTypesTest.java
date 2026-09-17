@@ -107,6 +107,16 @@ class WhatsAppInboundTypesTest {
     }
 
     @Test
+    void aSubmittedFlowShowsItsAnswersNotTheWordSent() {
+        WhatsAppMessage m = inbound("""
+                {"id":"w3f","from":"919000000001","type":"interactive",
+                 "interactive":{"type":"nfm_reply","nfm_reply":{"name":"flow","body":"Sent",
+                   "response_json":"{\\"flow_token\\":\\"flw_5_a\\",\\"name\\":\\"PUNIT SHARMA\\",\\"budget\\":\\"500000\\"}"}}}""");
+        assertEquals(WhatsAppMessageType.INTERACTIVE, m.getMessageType());
+        assertEquals("Form submitted\nname: PUNIT SHARMA\nbudget: 500000", m.getBody());
+    }
+
+    @Test
     void listReplyShowsTheRowTitle() {
         WhatsAppMessage m = inbound("""
                 {"id":"w4","from":"919000000001","type":"interactive",
@@ -265,6 +275,38 @@ class WhatsAppInboundTypesTest {
         inbound("""
                 {"id":"w21","from":"919000000001","type":"text","text":{"body":"just text"}}""");
         verify(mediaService).fetchAfterCommit(any(), any(), eq(null));
+    }
+
+    @Test
+    void aClickToWhatsAppAdIsRemembered() {
+        WhatsAppMessage m = inbound("""
+                {"id":"w30","from":"919000000001","type":"text","text":{"body":"Is this available?"},
+                 "referral":{"source_url":"https://fb.me/x","source_id":"123","source_type":"ad",
+                             "headline":"Diwali offer","ctwa_clid":"ARxyz"}}""");
+        assertEquals("ad", m.getReferralSource());
+    }
+
+    @Test
+    void anAdClickIdAloneStillMeansAnAd() {
+        WhatsAppMessage m = inbound("""
+                {"id":"w31","from":"919000000001","type":"text","text":{"body":"Hi"},
+                 "referral":{"ctwa_clid":"ARxyz"}}""");
+        assertEquals("ad", m.getReferralSource());
+    }
+
+    @Test
+    void aPagePostReferralIsRemembered() {
+        WhatsAppMessage m = inbound("""
+                {"id":"w32","from":"919000000001","type":"text","text":{"body":"Hi"},
+                 "referral":{"source_type":"post","source_id":"456"}}""");
+        assertEquals("post", m.getReferralSource());
+    }
+
+    @Test
+    void anOrdinaryMessageHasNoReferral() {
+        WhatsAppMessage m = inbound("""
+                {"id":"w33","from":"919000000001","type":"text","text":{"body":"Hi"}}""");
+        assertNull(m.getReferralSource());
     }
 
     @Test

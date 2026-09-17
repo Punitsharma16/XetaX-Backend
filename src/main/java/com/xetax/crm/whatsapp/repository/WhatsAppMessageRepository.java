@@ -48,6 +48,23 @@ public interface WhatsAppMessageRepository extends JpaRepository<WhatsAppMessage
             String ownerUserId, com.xetax.crm.whatsapp.enums.MessageDirection direction,
             LocalDateTime from);
 
+    /**
+     * Charge estimate, outbound side — only the columns the rules need, in this
+     * order: id, conversationId, messageType, templateName, templateLanguage,
+     * status, toPhone, sentAt, deliveredAt, readAt, createdAt.
+     */
+    @Query("SELECT m.id, m.conversationId, m.messageType, m.templateName, m.templateLanguage, "
+            + "m.status, m.toPhone, m.sentAt, m.deliveredAt, m.readAt, m.createdAt "
+            + "FROM WhatsAppMessage m WHERE m.whatsappConfigId = :configId "
+            + "AND m.direction = 'OUTBOUND' AND m.createdAt >= :from")
+    List<Object[]> outboundForCharges(@Param("configId") Long configId, @Param("from") LocalDateTime from);
+
+    /** Charge estimate, inbound side: conversationId, deliveredAt (Meta's time), createdAt, referralSource. */
+    @Query("SELECT m.conversationId, m.deliveredAt, m.createdAt, m.referralSource "
+            + "FROM WhatsAppMessage m WHERE m.whatsappConfigId = :configId "
+            + "AND m.direction = 'INBOUND' AND m.createdAt >= :from")
+    List<Object[]> inboundForCharges(@Param("configId") Long configId, @Param("from") LocalDateTime from);
+
     /** Did this thread ever receive a campaign message? (bot scope = CAMPAIGN replies only) */
     boolean existsByConversationIdAndCampaignIdIsNotNull(Long conversationId);
     /** Public media link → the message that owns the file. */

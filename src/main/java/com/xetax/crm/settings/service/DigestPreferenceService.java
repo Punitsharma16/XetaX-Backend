@@ -10,6 +10,10 @@ import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+import org.springframework.beans.factory.annotation.Value;
+import java.time.Instant;
+import java.time.LocalDate;
+import java.time.ZoneId;
 import java.util.LinkedHashMap;
 import java.util.Map;
 import java.util.UUID;
@@ -35,12 +39,39 @@ public class DigestPreferenceService {
         public static final Channels DEFAULTS = new Channels(true, true, true);
     }
 
-    /** For the scheduler: no saved row means everything on, as before. */
+    /**
+     * Accounts opened on or after this date start with the WhatsApp digest off:
+     * from 1 October 2026 Meta charges for every message a business sends,
+     * replies inside the 24-hour window included. Older accounts keep what they
+     * have always had, so nobody's digest disappears without them choosing it.
+     */
+    @Value("${app.digest-whatsapp-off-for-accounts-from:2026-09-18}")
+    private String whatsappOffFrom;
+
+    /** For the scheduler: what the owner saved, or the defaults for their account. */
     public Channels forOwner(String ownerUserId) {
         if (ownerUserId == null || ownerUserId.isBlank()) return Channels.DEFAULTS;
         return repository.findByOwnerUserId(ownerUserId)
                 .map(p -> new Channels(p.isEnabled(), p.isEmailEnabled(), p.isWhatsappEnabled()))
-                .orElse(Channels.DEFAULTS);
+                .orElseGet(() -> defaultsFor(ownerUserId));
+    }
+
+    /** No saved row: everything on, except WhatsApp for accounts opened after the cut-off. */
+    Channels defaultsFor(String ownerUserId) {
+        return new Channels(true, true, !isNewAccount(ownerUserId));
+    }
+
+    private boolean isNewAccount(String ownerUserId) {
+        try {
+            Instant cutoff = LocalDate.parse(whatsappOffFrom)
+                    .atStartOfDay(ZoneId.of("Asia/Kolkata")).toInstant();
+            return authUserRepository.findById(UUID.fromString(ownerUserId))
+                    .map(user -> user.getCreateAt() != null && !user.getCreateAt().isBefore(cutoff))
+                    .orElse(false);
+        } catch (Exception e) {
+            // Unknown account or unreadable date: keep the behaviour it always had.
+            return false;
+        }
     }
 
     public Map<String, Object> get() {
@@ -66,8 +97,15 @@ public class DigestPreferenceService {
             throw new BadRequestException("Only the workspace owner can change the morning digest");
         }
         String owner = ownerId();
-        DigestPreference preference = repository.findByOwnerUserId(owner)
-                .orElseGet(() -> DigestPreference.builder().ownerUserId(owner).build());
+        // A first save starts from what the owner currently gets, not the entity defaults.
+        DigestPreference preference = repository.findByOwnerUserId(owner).orElseGet(() -> {
+            Channels current = forOwner(owner);
+            return DigestPreference.builder().ownerUserId(owner)
+                    .enabled(current.enabled())
+                    .emailEnabled(current.emailEnabled())
+                    .whatsappEnabled(current.whatsappEnabled())
+                    .build();
+        });
         if (enabled != null) preference.setEnabled(enabled);
         if (emailEnabled != null) preference.setEmailEnabled(emailEnabled);
         if (whatsappEnabled != null) preference.setWhatsappEnabled(whatsappEnabled);

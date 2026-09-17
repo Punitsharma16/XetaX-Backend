@@ -20,5 +20,8 @@ public interface WhatsAppCampaignRecipientRepository extends JpaRepository<Whats
 
     long countByCampaignIdAndStatusIn(Long campaignId, List<RecipientStatus> statuses);
 
+    long countByCampaignIdAndStatusInAndPhoneStartingWith(Long campaignId, List<RecipientStatus> statuses,
+                                                          String prefix);
+
     Optional<WhatsAppCampaignRecipient> findByProviderMessageId(String providerMessageId);
 }

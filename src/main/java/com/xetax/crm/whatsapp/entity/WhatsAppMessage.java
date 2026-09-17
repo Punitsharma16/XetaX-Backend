@@ -86,6 +86,14 @@ public class WhatsAppMessage extends BaseEntity {
     @Column(name = "media_size")
     private Long mediaSize;
 
+    /**
+     * Inbound only: where the customer came from when Meta says so — "ad" for a
+     * click-to-WhatsApp ad, "post" for a Page. Such a chat opens a free entry
+     * point window, which the charge estimate honours.
+     */
+    @Column(name = "referral_source", length = 16)
+    private String referralSource;
+
     @Column(length = 255)
     private String templateName;
 

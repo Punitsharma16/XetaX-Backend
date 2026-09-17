@@ -42,12 +42,19 @@ public class ChannelConfigService {
         return id.toString();
     }
 
+    /**
+     * AI replies per chat before the agent hands it to the team. Every AI reply
+     * on WhatsApp is a paid message from 1 October 2026, so a new setup stops
+     * sooner; configs already saved keep their own number.
+     */
+    public static final int DEFAULT_MAX_AI_TURNS = 10;
+
     public static AgentChannelConfig defaults(Long agentId, String ownerUserId) {
         return AgentChannelConfig.builder()
                 .agentId(agentId).ownerUserId(ownerUserId)
                 .whatsappEnabled(false).whatsappScope("ALL").pipelineMode("SUGGEST")
                 .targetFormId(null).stageHintsJson("[]").handoffKeywords("")
-                .maxAiTurns(30).websiteWaitMinutes(3).captureFields(true)
+                .maxAiTurns(DEFAULT_MAX_AI_TURNS).websiteWaitMinutes(3).captureFields(true)
                 .build();
     }
 
@@ -123,7 +130,7 @@ public class ChannelConfigService {
         cfg.setWhatsappScope("CAMPAIGN".equalsIgnoreCase(in.whatsappScope()) ? "CAMPAIGN" : "ALL");
         cfg.setPipelineMode("AUTO".equalsIgnoreCase(in.pipelineMode()) ? "AUTO" : "SUGGEST");
         cfg.setHandoffKeywords(in.handoffKeywords() == null ? "" : in.handoffKeywords().trim());
-        cfg.setMaxAiTurns(clamp(in.maxAiTurns(), 5, 200, 30));
+        cfg.setMaxAiTurns(clamp(in.maxAiTurns(), 5, 200, DEFAULT_MAX_AI_TURNS));
         cfg.setWebsiteWaitMinutes(clamp(in.websiteWaitMinutes(), 1, 30, 3));
         cfg.setCaptureFields(in.captureFields() == null || in.captureFields());
         if (cfg.getCreatedAt() == null) cfg.setCreatedAt(LocalDateTime.now());

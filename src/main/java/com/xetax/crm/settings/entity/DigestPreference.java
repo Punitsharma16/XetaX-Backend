@@ -10,7 +10,8 @@ import lombok.*;
  * <p>There is deliberately no switch for the notification bell: while the
  * digest is on it always lands there. Email and WhatsApp can each be turned
  * off, or the whole digest can be. A workspace with no row gets everything on,
- * which is how the digest behaved before this setting existed.
+ * except WhatsApp for accounts opened on or after the cut-off date — Meta charges
+ * for each of those messages from 1 October 2026 (see DigestPreferenceService).
  */
 @Entity
 @Table(name = "digest_preferences",

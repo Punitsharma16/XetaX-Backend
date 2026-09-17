@@ -5,6 +5,7 @@ import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.xetax.crm.common.exception.BadRequestException;
 import com.xetax.crm.common.exception.ResourceNotFoundException;
+import com.xetax.crm.data_manager.dto.FieldResponse;
 import com.xetax.crm.data_manager.dto.FormResponse;
 import com.xetax.crm.data_manager.dto.RecordRequest;
 import com.xetax.crm.data_manager.service.FieldService;
@@ -402,26 +403,70 @@ public class WhatsAppFlowService {
     private String createRecord(WhatsAppFlow flow, Map<String, Object> answers, String customerPhone) {
         FormResponse form = formService.getById(flow.getFormId());
         Map<String, String> map = readFieldMap(flow.getFieldMapJson());
+        Map<String, FieldResponse> fields = new LinkedHashMap<>();
+        for (FieldResponse field : fieldService.getAll(form.getId())) {
+            if (field.getFieldKey() != null) fields.put(field.getFieldKey(), field);
+        }
 
+        // Only keys the form has, each converted to its field's type. Record
+        // validation refuses the whole record over one unknown key or one
+        // text-for-a-number, and every answer is on the submission anyway.
         Map<String, Object> data = new LinkedHashMap<>();
         answers.forEach((key, value) -> {
-            if (value == null) return;
             String target = map.getOrDefault(key, key);
-            data.put(target, value);
+            FieldResponse field = fields.get(target);
+            if (field == null) return;
+            Object converted = FlowAnswerValues.convert(field, value, this::nationalPhone);
+            if (converted != null) data.put(target, converted);
         });
-        // The customer's number is the one thing the Flow never asks for, so it
-        // is filled in from the chat. WhatsApp gives it in international form
-        // while a CRM phone field wants the national one, so it is converted —
-        // and simply left out if it cannot be, since losing a phone number is
-        // better than losing the whole submission to a validation error.
+
+        // The customer's number is the one thing a Flow need not ask for. It
+        // goes into the form's own phone field — never a key the form lacks —
+        // and only when the customer did not give a number themselves.
         String national = nationalPhone(customerPhone);
-        if (national != null) {
-            data.putIfAbsent("PHONE", national);
+        List<String> phoneKeys = fields.values().stream()
+                .filter(field -> field.getFieldType() == com.xetax.crm.data_manager.enums.FieldType.PHONE)
+                .map(FieldResponse::getFieldKey)
+                .toList();
+        if (national != null && phoneKeys.stream().noneMatch(data::containsKey) && !phoneKeys.isEmpty()) {
+            data.put(phoneKeys.get(0), national);
         }
 
         RecordRequest recordRequest = new RecordRequest();
         recordRequest.setData(data);
         return recordService.create(form.getSlug(), recordRequest).getId();
+    }
+
+    /**
+     * Tries the record again for a submission whose answers were kept but
+     * whose record failed — after the form or the Flow mapping was fixed.
+     */
+    @Transactional
+    public FlowResponseView retryRecord(Long responseId) {
+        String owner = configService.currentUserId();
+        WhatsAppFlowResponse row = responseRepository.findById(responseId)
+                .filter(r -> Objects.equals(r.getOwnerUserId(), owner))
+                .orElseThrow(() -> new ResourceNotFoundException("Submission not found"));
+        WhatsAppFlow flow = row.getFlowId() == null ? null
+                : flowRepository.findById(row.getFlowId())
+                        .filter(f -> Objects.equals(f.getOwnerUserId(), owner))
+                        .orElse(null);
+        if (row.getRecordId() != null) return toResponseView(row, flow);
+        if (flow == null || flow.getFormId() == null) {
+            throw new BadRequestException("This Flow does not create records — link it to a form first");
+        }
+        if (row.getAnswersJson() == null || row.getAnswersJson().isBlank()) {
+            throw new BadRequestException("The customer has not submitted this Flow yet");
+        }
+        Map<String, Object> answers = readAnswers(row.getAnswersJson());
+        try {
+            row.setRecordId(createRecord(flow, answers, row.getCustomerPhone()));
+            row.setNote("Submitted — record created");
+        } catch (Exception e) {
+            row.setNote("Submitted — could not create the record: " + cut(e.getMessage(), 300));
+        }
+        responseRepository.save(row);
+        return toResponseView(row, flow);
     }
 
     /**

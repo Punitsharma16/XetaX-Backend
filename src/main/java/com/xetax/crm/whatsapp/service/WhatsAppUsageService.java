@@ -44,19 +44,24 @@ public class WhatsAppUsageService {
     private final SecretEncryptionService encryption;
     private final StringRedisTemplate redis;
     private final ObjectMapper objectMapper;
+    private final com.xetax.crm.whatsapp.pricing.WhatsAppChargeService chargeService;
 
     public Map<String, Object> usage() {
         WhatsAppConfig config = configService.requireConnectedConfig();
 
-        ZoneId zone = ZoneId.systemDefault();
+        // Meta's month starts at midnight in the account's zone (IST for Indian
+        // accounts); createdAt is stored in the server's own zone.
+        ZoneId zone = chargeService.zone();
         LocalDate today = LocalDate.now(zone);
-        LocalDateTime monthStart = today.withDayOfMonth(1).atStartOfDay();
+        java.time.ZonedDateTime monthStartZoned = today.withDayOfMonth(1).atStartOfDay(zone);
+        LocalDateTime monthStart = monthStartZoned.withZoneSameInstant(ZoneId.systemDefault()).toLocalDateTime();
 
         Map<String, Object> result = new LinkedHashMap<>();
         result.put("month", today.getMonth() + " " + today.getYear());
         result.put("counts", dbCounts(config.getOwnerUserId(), monthStart));
         result.put("categories", categoryCounts(config, monthStart));
-        result.put("spend", spend(config, monthStart.atZone(zone).toEpochSecond(),
+        result.put("estimate", chargeService.monthEstimate(config, java.time.YearMonth.from(today)));
+        result.put("spend", spend(config, monthStartZoned.toEpochSecond(),
                 Instant.now().getEpochSecond()));
         return result;
     }

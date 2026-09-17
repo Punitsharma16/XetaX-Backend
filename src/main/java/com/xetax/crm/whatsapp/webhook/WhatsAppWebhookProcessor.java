@@ -226,6 +226,7 @@ public class WhatsAppWebhookProcessor {
                     .body(body)
                     .mediaId(mediaId)
                     .mediaFilename(mediaFilename)
+                    .referralSource(referralSourceOf(inbound))
                     .providerMessageId(wamid)
                     .status(WhatsAppMessageStatus.DELIVERED)
                     .deliveredAt(timestampOf(inbound))
@@ -296,11 +297,45 @@ public class WhatsAppWebhookProcessor {
         String title = reply.path("title").asText("");
         if (!title.isBlank()) return title;
 
+        // A submitted Flow: Meta's body is only the word "Sent", so the thread
+        // shows what the customer actually filled in.
+        if ("nfm_reply".equals(type)) {
+            String answers = flowAnswersText(reply.path("response_json").asText(""));
+            if (answers != null) return answers;
+        }
+
         // A submitted Flow carries a human-readable body plus its answers.
         String body = reply.path("body").asText("");
         if (!body.isBlank()) return body;
 
         return interactive.toString();
+    }
+
+    private static final com.fasterxml.jackson.databind.ObjectMapper ANSWERS = new com.fasterxml.jackson.databind.ObjectMapper();
+
+    /** "Form submitted" and one "key: value" line per answer; null when there is nothing to show. */
+    static String flowAnswersText(String responseJson) {
+        if (responseJson == null || responseJson.isBlank()) return null;
+        try {
+            StringBuilder text = new StringBuilder("Form submitted");
+            int shown = 0;
+            var fields = ANSWERS.readTree(responseJson).properties();
+            for (var entry : fields) {
+                if ("flow_token".equals(entry.getKey())) continue;
+                JsonNode value = entry.getValue();
+                String shownValue = value.isArray()
+                        ? String.join(", ", ANSWERS.convertValue(value, String[].class))
+                        : value.isValueNode() ? value.asText() : value.toString();
+                if (shownValue.isBlank()) continue;
+                text.append('\n').append(entry.getKey()).append(": ").append(shownValue);
+                shown++;
+            }
+            if (shown == 0) return "Form submitted";
+            String out = text.toString();
+            return out.length() > 3900 ? out.substring(0, 3900) + "…" : out;
+        } catch (Exception e) {
+            return null;
+        }
     }
 
     /**
@@ -356,6 +391,19 @@ public class WhatsAppWebhookProcessor {
             }
             default -> "[" + type + " message]";
         };
+    }
+
+    /**
+     * A customer who tapped a click-to-WhatsApp ad or a Page button arrives with
+     * a referral block. Its source_type is "ad" or "post"; an ad click id alone
+     * still means an ad.
+     */
+    static String referralSourceOf(JsonNode inbound) {
+        JsonNode referral = inbound.path("referral");
+        if (referral.isMissingNode() || referral.isNull() || !referral.isObject() || referral.isEmpty()) return null;
+        String type = referral.path("source_type").asText("").trim().toLowerCase(java.util.Locale.ROOT);
+        if (!type.isEmpty()) return type.length() > 16 ? type.substring(0, 16) : type;
+        return referral.hasNonNull("ctwa_clid") ? "ad" : "referral";
     }
 
     private static String captionOr(JsonNode media, String fallback) {

@@ -30,6 +30,7 @@ public class WhatsAppConfigController {
     private final WhatsAppOnboardingService onboardingService;
     private final WhatsAppTemplateService templateService;
     private final WhatsAppUsageService usageService;
+    private final com.xetax.crm.whatsapp.service.WhatsAppTemplateMediaService templateMediaService;
 
     @GetMapping("/config")
     @RequiresPermission("whatsapp.view")
@@ -97,9 +98,17 @@ public class WhatsAppConfigController {
     public ApiResponse<java.util.Map<String, String>> uploadTemplateSample(
             @RequestParam("file") MultipartFile file) {
         try {
-            String handle = templateService.uploadSample(
-                    file.getBytes(), file.getOriginalFilename(), file.getContentType());
-            return ResponseUtil.success("Sample uploaded", java.util.Map.of("handle", handle));
+            byte[] bytes = file.getBytes();
+            String handle = templateService.uploadSample(bytes, file.getOriginalFilename(), file.getContentType());
+            // The same file, hosted here, is the link every send carries — so the
+            // owner never has to find hosting of their own. Null for a type a
+            // template cannot send; they can still paste a link then.
+            String url = templateMediaService.store(configService.currentUserId(), bytes,
+                    file.getOriginalFilename(), file.getContentType()).orElse(null);
+            java.util.Map<String, String> out = new java.util.LinkedHashMap<>();
+            out.put("handle", handle);
+            out.put("url", url);
+            return ResponseUtil.success("Sample uploaded", out);
         } catch (java.io.IOException e) {
             throw new com.xetax.crm.common.exception.BadRequestException("Could not read the uploaded file");
         }
