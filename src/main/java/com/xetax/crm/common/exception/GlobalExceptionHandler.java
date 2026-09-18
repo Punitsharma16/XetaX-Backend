@@ -9,6 +9,7 @@ import org.springframework.web.bind.annotation.RestControllerAdvice;
 import java.util.List;
 
 @RestControllerAdvice
+@lombok.extern.slf4j.Slf4j
 public class GlobalExceptionHandler {
 
     @ExceptionHandler(ResourceNotFoundException.class)
@@ -79,8 +80,16 @@ public class GlobalExceptionHandler {
                 .message("The uploaded file is too large").build());
     }
 
+    /**
+     * The client only gets a sentence it can act on, but the database's own
+     * reason — which constraint, which column — is what makes this reportable
+     * at all, so it is logged. Without it a 409 in production said nothing
+     * about what actually went wrong.
+     */
     @ExceptionHandler(org.springframework.dao.DataIntegrityViolationException.class)
     public ResponseEntity<ErrorResponse> handleDataIntegrity(org.springframework.dao.DataIntegrityViolationException ex) {
+        Throwable cause = ex.getMostSpecificCause();
+        log.error("Data integrity violation: {}", cause.getMessage(), ex);
         return ResponseEntity.status(HttpStatus.CONFLICT).body(ErrorResponse.builder()
                 .success(false).status(HttpStatus.CONFLICT.value()).error("CONFLICT")
                 .message("This change conflicts with existing data — something still refers to it").build());

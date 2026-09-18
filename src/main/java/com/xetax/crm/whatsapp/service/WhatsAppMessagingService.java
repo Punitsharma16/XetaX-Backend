@@ -56,6 +56,15 @@ public class WhatsAppMessagingService {
     private final WhatsAppTemplateVariables templateVariables;
     private final WhatsAppMediaService mediaService;
     private final TemplateFlowTokens flowTokens;
+    /**
+     * This same service, but through the Spring proxy. Calling dispatchAsync on
+     * {@code this} bypassed the proxy, so @Async never applied: Meta was called
+     * on the HTTP thread, inside the caller's transaction. A database error
+     * while dispatching then failed the caller's request — a constraint
+     * violation surfaced as a 409 — and rolled the queued message back even
+     * though WhatsApp had already delivered it.
+     */
+    private final org.springframework.beans.factory.ObjectProvider<WhatsAppMessagingService> self;
 
     /** Meta's customer-service window: free text only within 24h of the last inbound. */
     private static final java.time.Duration SERVICE_WINDOW = java.time.Duration.ofHours(24);
@@ -77,7 +86,9 @@ public class WhatsAppMessagingService {
                                     WhatsAppTemplateRepository templateRepository,
                                     WhatsAppTemplateVariables templateVariables,
                                     WhatsAppMediaService mediaService,
-                                    TemplateFlowTokens flowTokens) {
+                                    TemplateFlowTokens flowTokens,
+                                    org.springframework.beans.factory.ObjectProvider<
+                                            WhatsAppMessagingService> self) {
         this.messageRepository = messageRepository;
         this.conversationRepository = conversationRepository;
         this.configRepository = configRepository;
@@ -92,6 +103,7 @@ public class WhatsAppMessagingService {
         this.templateVariables = templateVariables;
         this.mediaService = mediaService;
         this.flowTokens = flowTokens;
+        this.self = self;
     }
 
     /** True when a free-form text may be sent to this phone (24h window open). */
@@ -150,7 +162,7 @@ public class WhatsAppMessagingService {
                 componentsJson, request.getRecordId(), null);
 
         // For INTERACTIVE the buttons ride the same side-channel templates use.
-        dispatchAsync(message.getId(), interactive ? request.getButtonsJson() : componentsJson);
+        dispatchAfterCommit(message.getId(), interactive ? request.getButtonsJson() : componentsJson);
         return toResponse(message, mediaService.publicUrl(message));
     }
 
@@ -213,7 +225,7 @@ public class WhatsAppMessagingService {
                 null, null, null, null, null);
         message.setMediaId(mediaId);
         messageRepository.save(message);
-        dispatchAsync(message.getId(), null);
+        dispatchAfterCommit(message.getId(), null);
         return toResponse(message, mediaService.publicUrl(message));
     }
 
@@ -233,7 +245,7 @@ public class WhatsAppMessagingService {
         }
         WhatsAppMessage message = queueOutbound(config, phone, WhatsAppMessageType.TEXT,
                 body, null, null, null, null, null);
-        dispatchAsync(message.getId(), null);
+        dispatchAfterCommit(message.getId(), null);
     }
 
     /** Connected config of a workspace, if any (no security context needed). */
@@ -285,7 +297,7 @@ public class WhatsAppMessagingService {
         }
         WhatsAppMessage message = queueOutbound(config, phone, WhatsAppMessageType.TEMPLATE,
                 "[template] " + templateName, templateName, lang, componentsJson, recordId, null);
-        dispatchAsync(message.getId(), componentsJson);
+        dispatchAfterCommit(message.getId(), componentsJson);
         return true;
     }
 
@@ -321,7 +333,7 @@ public class WhatsAppMessagingService {
                 null, null, null, null, null);
         message.setMediaId(mediaId);
         messageRepository.save(message);
-        dispatchAsync(message.getId(), null);
+        dispatchAfterCommit(message.getId(), null);
     }
 
     public List<WhatsAppMessageResponse> recordHistory(String recordId) {
@@ -389,6 +401,38 @@ public class WhatsAppMessagingService {
     }
 
     /* ------------------------------------------------------------ dispatch */
+
+    /**
+     * Hands the message to the executor once the caller's transaction has
+     * committed — through the proxy, so @Async actually applies.
+     *
+     * <p>Two things were wrong with calling dispatchAsync directly. It ran on
+     * the caller's thread, so the HTTP request waited for Meta (and for a rate
+     * limit slot, up to three minutes) and any database error while dispatching
+     * came back to the user as the send's own failure. And it ran inside the
+     * caller's transaction, so the QUEUED row was not committed yet: the work
+     * the dispatcher did could be rolled back together with it.
+     *
+     * <p>Waiting for the commit is what makes the executor safe: the worker
+     * looks the message up by id, which only exists for it once committed.
+     * With no transaction around the call (schedulers, tests) it is dispatched
+     * straight away.
+     */
+    private void dispatchAfterCommit(Long messageId, String componentsJson) {
+        if (messageId == null) return;
+        if (!org.springframework.transaction.support.TransactionSynchronizationManager
+                .isSynchronizationActive()) {
+            self.getObject().dispatchAsync(messageId, componentsJson);
+            return;
+        }
+        org.springframework.transaction.support.TransactionSynchronizationManager.registerSynchronization(
+                new org.springframework.transaction.support.TransactionSynchronization() {
+                    @Override
+                    public void afterCommit() {
+                        self.getObject().dispatchAsync(messageId, componentsJson);
+                    }
+                });
+    }
 
     @Async("whatsappExecutor")
     public void dispatchAsync(Long messageId, String componentsJson) {
@@ -484,8 +528,8 @@ public class WhatsAppMessagingService {
         } else {
             meterRegistry.counter("whatsapp.messages.failed").increment();
             message.setStatus(WhatsAppMessageStatus.FAILED);
-            message.setErrorCode(result.errorCode());
-            message.setErrorMessage(result.errorMessage());
+            message.setErrorCode(clamp(result.errorCode(), 32));
+            message.setErrorMessage(clamp(result.errorMessage(), 500));
         }
         messageRepository.save(message);
     }
@@ -498,10 +542,21 @@ public class WhatsAppMessagingService {
     public void markFailed(Long messageId, String code, String errorMessage) {
         messageRepository.findById(messageId).ifPresent(message -> {
             message.setStatus(WhatsAppMessageStatus.FAILED);
-            message.setErrorCode(code);
-            message.setErrorMessage(errorMessage);
+            message.setErrorCode(clamp(code, 32));
+            message.setErrorMessage(clamp(errorMessage, 500));
             messageRepository.save(message);
         });
+    }
+
+    /**
+     * Meta writes its own sentences, and some of them are longer than the
+     * columns that hold them. MySQL rejects an over-long value rather than
+     * cutting it, which used to turn "the send failed" into a failed database
+     * write — so the reason is trimmed to what the column takes.
+     */
+    private static String clamp(String value, int max) {
+        if (value == null) return null;
+        return value.length() <= max ? value : value.substring(0, max);
     }
 
     /**
