@@ -1,0 +1,276 @@
+{
+  "key": "salon",
+  "name": "Hair Salon Bookings",
+  "icon": "bi-scissors",
+  "color": "#db2777",
+  "industry": "Salon / Spa",
+  "tags": ["appointments", "stylists", "slots"],
+  "language": "hinglish",
+  "tagline": "Slot chuna, booking hui, record ban gaya",
+  "description": "Hair salon, barber shop aur spa ke liye: apne stylists ke slots banao, customer WhatsApp, bot ya booking page se sirf khali slot chun sakta hai, aur har booking ka record apne aap ban jata hai.",
+  "fields": [
+    {
+      "label": "Customer Name",
+      "fieldKey": "customer_name",
+      "fieldType": "TEXT",
+      "required": true,
+      "optionsJson": null
+    },
+    {
+      "label": "Phone",
+      "fieldKey": "phone",
+      "fieldType": "PHONE",
+      "required": true,
+      "optionsJson": null
+    },
+    {
+      "label": "Service",
+      "fieldKey": "service",
+      "fieldType": "SELECT",
+      "required": false,
+      "optionsJson": "[\"Haircut\",\"Hair Colour\",\"Beard Trim\",\"Hair Spa\",\"Facial\",\"Bridal Makeup\",\"Other\"]"
+    },
+    {
+      "label": "Stylist",
+      "fieldKey": "stylist",
+      "fieldType": "TEXT",
+      "required": false,
+      "optionsJson": null
+    },
+    {
+      "label": "Appointment Date",
+      "fieldKey": "appointment_date",
+      "fieldType": "DATE",
+      "required": false,
+      "optionsJson": null
+    },
+    {
+      "label": "Slot Time",
+      "fieldKey": "slot_time",
+      "fieldType": "TEXT",
+      "required": false,
+      "optionsJson": null
+    },
+    {
+      "label": "Amount",
+      "fieldKey": "amount",
+      "fieldType": "NUMBER",
+      "required": false,
+      "optionsJson": null
+    },
+    {
+      "label": "Notes",
+      "fieldKey": "notes",
+      "fieldType": "TEXTAREA",
+      "required": false,
+      "optionsJson": null
+    }
+  ],
+  "stages": [
+    {
+      "name": "Booked",
+      "code": "BOOKED",
+      "sequence": 1,
+      "isDefault": true,
+      "isFinal": false,
+      "color": "#6366f1",
+      "statuses": []
+    },
+    {
+      "name": "Confirmed",
+      "code": "CONFIRMED",
+      "sequence": 2,
+      "isDefault": false,
+      "isFinal": false,
+      "color": "#0ea5e9",
+      "statuses": []
+    },
+    {
+      "name": "In Chair",
+      "code": "IN_CHAIR",
+      "sequence": 3,
+      "isDefault": false,
+      "isFinal": false,
+      "color": "#f59e0b",
+      "statuses": []
+    },
+    {
+      "name": "Done",
+      "code": "DONE",
+      "sequence": 4,
+      "isDefault": false,
+      "isFinal": true,
+      "color": "#22c55e",
+      "statuses": [
+        {
+          "name": "Paid",
+          "color": "#22c55e",
+          "isDefault": true
+        },
+        {
+          "name": "Payment Pending",
+          "color": "#f59e0b",
+          "isDefault": false
+        }
+      ]
+    },
+    {
+      "name": "Cancelled",
+      "code": "CANCELLED",
+      "sequence": 5,
+      "isDefault": false,
+      "isFinal": true,
+      "color": "#ef4444",
+      "statuses": [
+        {
+          "name": "Customer cancelled",
+          "color": "#ef4444",
+          "isDefault": true
+        },
+        {
+          "name": "No show",
+          "color": "#991b1b",
+          "isDefault": false
+        }
+      ]
+    }
+  ],
+  "automations": [
+    {
+      "name": "Booking received",
+      "trigger": "RECORD_CREATED",
+      "triggerStageCode": null,
+      "triggerStatusName": null,
+      "actionType": "SEND_WHATSAPP",
+      "actionFieldKey": "phone",
+      "actionValue": null,
+      "emailSubject": null,
+      "emailMessage": "{customer_name} ji, aapki booking mil gayi — {appointment_date} ko {slot_time} baje, {stylist} ke saath. Jald confirm karte hain. ✂️",
+      "note": "Slot book hote hi customer ko confirmation"
+    },
+    {
+      "name": "Booking confirmed",
+      "trigger": "STAGE_CHANGED",
+      "triggerStageCode": "CONFIRMED",
+      "triggerStatusName": null,
+      "actionType": "SEND_WHATSAPP",
+      "actionFieldKey": "phone",
+      "actionValue": null,
+      "emailSubject": null,
+      "emailMessage": "{customer_name} ji, aapki appointment confirm hai — {appointment_date}, {slot_time}. Milte hain!",
+      "note": "Confirm karte hi customer ko pakka message"
+    },
+    {
+      "name": "Thank you after the visit",
+      "trigger": "STAGE_CHANGED",
+      "triggerStageCode": "DONE",
+      "triggerStatusName": null,
+      "actionType": "SEND_WHATSAPP",
+      "actionFieldKey": "phone",
+      "actionValue": null,
+      "emailSubject": null,
+      "emailMessage": "Thank you {customer_name} ji! Kaisa laga? 1-5 me rating bhej dijiye. 💇",
+      "note": "Visit ke baad feedback"
+    },
+    {
+      "name": "Cancelled — slot free",
+      "trigger": "STAGE_CHANGED",
+      "triggerStageCode": "CANCELLED",
+      "triggerStatusName": null,
+      "actionType": "SEND_WHATSAPP",
+      "actionFieldKey": "phone",
+      "actionValue": null,
+      "emailSubject": null,
+      "emailMessage": "{customer_name} ji, aapki booking cancel kar di gayi hai. Nayi booking kabhi bhi kar sakte hain.",
+      "note": "Cancel hone par customer ko batao"
+    }
+  ],
+  "whatsappTemplates": [
+    {
+      "name": "appointment_confirmed",
+      "purpose": "Confirm an appointment",
+      "category": "UTILITY",
+      "language": "en",
+      "bodyText": "Hi {{1}}, your appointment is confirmed for {{2}} at {{3}} with {{4}}. See you soon!",
+      "exampleParams": ["Priya", "Sat, 21 Sep", "11:30 AM", "Neha"]
+    },
+    {
+      "name": "appointment_reminder",
+      "purpose": "Remind the customer a day before",
+      "category": "UTILITY",
+      "language": "en",
+      "bodyText": "Hi {{1}}, a reminder for your appointment tomorrow at {{2}}. Reply RESCHEDULE if you need another time.",
+      "exampleParams": ["Priya", "11:30 AM"]
+    },
+    {
+      "name": "feedback_request",
+      "purpose": "Ask for feedback after the visit",
+      "category": "MARKETING",
+      "language": "en",
+      "bodyText": "Hi {{1}}, hope you loved your new look! Reply with a rating 1-5 — it helps us serve you better.",
+      "exampleParams": ["Priya"]
+    }
+  ],
+  "agent": {
+    "name": "Booking Assistant",
+    "persona": "You are a warm salon receptionist. Share services, prices and timings from the knowledge. To book, take the customer's name and phone, then offer ONLY the slots listed in AVAILABLE SLOTS and book the one they choose with the book_slot action. Never invent a time, a stylist or a price, and never promise a slot that is not on that list.",
+    "welcomeMessage": "Hi! Would you like to book an appointment? Tell me the service you want and I'll share the free slots.",
+    "handoffKeywords": "complaint, refund, manager, human, owner",
+    "pipelineMode": "AUTO",
+    "captureFields": true,
+    "stageHints": [
+      {
+        "stageCode": "CONFIRMED",
+        "hint": "the customer confirms the slot and the service"
+      },
+      {
+        "stageCode": "CANCELLED",
+        "hint": "the customer says they cannot come or wants to cancel"
+      }
+    ]
+  },
+  "playbook": {
+    "goal": "Fill the diary: turn every enquiry into a booked slot, keep the customer reminded, and bring them back after the visit.",
+    "qualificationKeys": ["phone", "service"],
+    "quietStart": 22,
+    "quietEnd": 9,
+    "maxFollowUps": 2,
+    "rules": [
+      {
+        "name": "Booking not confirmed",
+        "trigger": "STAGE_IDLE",
+        "action": "SEND_MESSAGE",
+        "active": true,
+        "afterMinutes": 30,
+        "stageCodes": ["BOOKED"],
+        "maxRepeats": 1,
+        "aiCompose": true,
+        "message": "Hi {customer_name}, shall I confirm your appointment on {appointment_date} at {slot_time}? Reply YES."
+      },
+      {
+        "name": "Feedback after the visit",
+        "trigger": "STAGE_IDLE",
+        "action": "SEND_MESSAGE",
+        "active": true,
+        "afterMinutes": 180,
+        "stageCodes": ["DONE"],
+        "maxRepeats": 1,
+        "aiCompose": false,
+        "templateName": "feedback_request",
+        "message": "Hope you loved your new look! Reply with a rating 1-5 — it helps us improve.",
+        "templateParams": ["customer_name"]
+      },
+      {
+        "name": "Unhappy customer → manager",
+        "trigger": "INTEREST",
+        "action": "HANDOFF",
+        "active": true,
+        "interest": "COLD",
+        "taskTitle": "Unhappy customer — call back",
+        "taskDueHours": 1,
+        "message": "AI sentiment is negative. A manager should call this customer.",
+        "stageCodes": []
+      }
+    ]
+  }
+}

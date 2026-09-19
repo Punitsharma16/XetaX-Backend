@@ -119,6 +119,12 @@ public class OutreachService {
                         row.put("body", m.getBody());
                         row.put("templateName", m.getTemplateName());
                         row.put("status", m.getStatus());
+                        // Why it failed — the email history beside this one has
+                        // always carried its reason, while a WhatsApp message
+                        // only said "FAILED": nothing told whether the number
+                        // was wrong, the template unapproved or the window shut.
+                        row.put("errorCode", m.getErrorCode());
+                        row.put("errorMessage", m.getErrorMessage());
                         row.put("createdAt", m.getCreatedAt());
                         // Same public link the inbox uses, so a record's chat
                         // shows the customer's photos and files too.

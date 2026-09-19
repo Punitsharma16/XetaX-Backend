@@ -7,6 +7,8 @@ import com.xetax.crm.agent.service.AgentKnowledgeService;
 import com.xetax.crm.auth.user.AuthUserEntity;
 import com.xetax.crm.auth.user.AuthUserRepository;
 import com.xetax.crm.automation.engine.AutomationEngine;
+import com.xetax.crm.booking.service.AppointmentService;
+import com.xetax.crm.booking.service.SlotsPrompt;
 import com.xetax.crm.automation.enums.AutomationTrigger;
 import com.xetax.crm.billing.AiQuotaService;
 import com.xetax.crm.contact.Contact;
@@ -105,6 +107,8 @@ public class BotConversationService {
     private final DocumentPersonalizer personalizer;
     private final MessageDeliveryService delivery;
     private final TaskRepository taskRepository;
+    /** The salon diary — empty for every business that does not take bookings. */
+    private final AppointmentService appointmentService;
     private final ChatClient chatClient;
     private final ObjectMapper mapper = new ObjectMapper();
 
@@ -122,6 +126,7 @@ public class BotConversationService {
                                   SalesPlaybookRepository playbooks, PlaybookRunRepository playbookRuns,
                                   DocumentFileRepository documents, DocumentPersonalizer personalizer,
                                   MessageDeliveryService delivery, TaskRepository taskRepository,
+                                  AppointmentService appointmentService,
                                   ChatClient.Builder builder) {
         this.sessions = sessions; this.messages = messages; this.handoffs = handoffs;
         this.configService = configService; this.agentRepository = agentRepository;
@@ -135,6 +140,7 @@ public class BotConversationService {
         this.permissionService = permissionService;
         this.playbooks = playbooks; this.playbookRuns = playbookRuns; this.documents = documents;
         this.personalizer = personalizer; this.delivery = delivery; this.taskRepository = taskRepository;
+        this.appointmentService = appointmentService;
         // Fresh client: no CRM tools, no shared memory — history is passed explicitly.
         this.chatClient = builder.build();
     }
@@ -291,14 +297,20 @@ public class BotConversationService {
         if (reply == null || reply.isBlank()) reply = "Could you tell me a bit more so I can help?";
 
         int applied = 0;
+        List<String> notes = new ArrayList<>();
         for (JsonNode action : actions) {
             if (applied++ >= 4) break;
             try {
-                applyAction(agent, cfg, session, action);
+                // A booking is the one action whose outcome the customer must
+                // hear about: the slot may have gone between the model reading
+                // the list and this line running.
+                String note = applyAction(agent, cfg, session, action);
+                if (note != null && !note.isBlank()) notes.add(note);
             } catch (Exception e) {
                 log.warn("Bot action skipped ({}): {}", action, e.getMessage());
             }
         }
+        if (!notes.isEmpty()) reply = reply + "\n\n" + String.join("\n", notes);
 
         session.setAiTurns(session.getAiTurns() + 1);
         if (ChatSession.STATUS_AI.equals(session.getStatus()) && session.getAiTurns() >= cfg.getMaxAiTurns()) {
@@ -336,6 +348,10 @@ public class BotConversationService {
         SalesPlaybook playbook = playbookFor(cfg);
         String playbookBlock = playbookBlock(playbook, cfg, session);
         String extraActions = playbookActions(playbook, cfg);
+        String slotsBlock = slotsBlock(agent);
+        String slotAction = slotsBlock.isEmpty() ? ""
+                : "  {\"type\":\"book_slot\",\"slotId\":<an id from AVAILABLE SLOTS>}"
+                  + "  -> when the customer picks one of those times\n";
 
         return """
                 You are "%s", the assistant of this business, chatting with a customer on %s.
@@ -360,7 +376,7 @@ public class BotConversationService {
 
                 KNOWLEDGE:
                 %s
-
+                %s
                 CONVERSATION SO FAR:
                 %s
                 %s
@@ -370,10 +386,31 @@ public class BotConversationService {
                 agent.getPersona() == null ? "" : agent.getPersona(),
                 playbookBlock,
                 "",
-                ctx.actionCatalog() + extraActions,
+                ctx.actionCatalog() + extraActions + slotAction,
                 knowledge.isEmpty() ? "(no relevant knowledge found)" : knowledge,
+                slotsBlock,
                 history.isEmpty() ? "(start of conversation)" : history,
                 ctx.recordBlock());
+    }
+
+    /**
+     * The free slots the bot may offer, read live from the salon's diary.
+     *
+     * <p>This is what keeps "choose from the available slots" honest on chat:
+     * the model cannot invent a time, it can only name one of these, and
+     * booking one goes through the same claim the public page uses. Empty for
+     * every business that does not take bookings, so nothing changes for them.
+     */
+    /**
+     * The free slots this business can still offer. This is what keeps
+     * "choose from the available slots" honest on chat: the model never sees
+     * the diary, only these lines, and booking one goes through the same claim
+     * the public page uses. Empty for a business that takes no bookings.
+     */
+    private String slotsBlock(AiAgent agent) {
+        String owner = agent.getOwnerUserId();
+        boolean takes = owner != null && appointmentService.takesBookings(owner);
+        return SlotsPrompt.render(takes, takes ? appointmentService.openSlots(owner, 20) : List.of());
     }
 
     private record RecordContext(String actionCatalog, String recordBlock) {}
@@ -499,7 +536,8 @@ public class BotConversationService {
 
     /* ================================================================ actions */
 
-    private void applyAction(AiAgent agent, AgentChannelConfig cfg, ChatSession session, JsonNode action) {
+    /** Returns a line to add to the reply, or null when the action is silent. */
+    private String applyAction(AiAgent agent, AgentChannelConfig cfg, ChatSession session, JsonNode action) {
         String type = action.path("type").asText("");
         switch (type) {
             case "handoff" -> requestHandoff(session, cfg, trim(action.path("reason").asText("Customer needs a person"), 200));
@@ -509,7 +547,40 @@ public class BotConversationService {
             case "send_document" -> sendPlaybookDocument(agent, cfg, session);
             case "book_followup" -> bookFollowup(agent, cfg, session,
                     action.path("hours").asInt(24), trim(action.path("note").asText(""), 500));
+            case "book_slot" -> {
+                return bookSlot(agent, session, action.path("slotId").asLong(0));
+            }
             default -> { }
+        }
+        return null;
+    }
+
+    /**
+     * Takes one of the slots the model was shown. The claim happens in the
+     * booking service, against the same diary the public page books from, so
+     * two customers can never be given the same chair — whoever's message
+     * lands first gets it and the other is told, in this reply, to pick again.
+     */
+    private String bookSlot(AiAgent agent, ChatSession session, long slotId) {
+        if (slotId <= 0) return null;
+        String name = blank(session.getCustomerName()) ? null : session.getCustomerName().trim();
+        String phone = blank(session.getCustomerPhone()) ? null : session.getCustomerPhone().trim();
+        if (name == null || phone == null) {
+            return "Could you tell me your name and phone number? Then I'll confirm the slot.";
+        }
+        try {
+            Map<String, Object> booked = appointmentService.bookForOwner(
+                    agent.getOwnerUserId(),
+                    new AppointmentService.BookRequest(slotId, name, phone, null, null),
+                    session.getRecordId());
+            if (session.getRecordId() == null && booked.get("recordId") != null) {
+                session.setRecordId(String.valueOf(booked.get("recordId")));
+                sessions.save(session);
+            }
+            return String.valueOf(booked.get("message"));
+        } catch (Exception e) {
+            log.info("Slot {} could not be booked from chat {}: {}", slotId, session.getId(), e.getMessage());
+            return "That slot has just been taken — tell me another time from the list and I'll book it.";
         }
     }
 

@@ -80,6 +80,7 @@ public class SecurityConfig {
                                 "/api/public/agents/**",
                                 "/api/public/forms/**",
                                 "/api/public/menu/**",
+                                "/api/public/booking/**",
                                 "/ws/**",
                                 "/actuator/health", "/actuator/health/**",
                                 "/v3/api-docs/**",
