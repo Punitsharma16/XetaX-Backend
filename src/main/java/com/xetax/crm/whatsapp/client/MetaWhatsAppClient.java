@@ -1,5 +1,6 @@
 package com.xetax.crm.whatsapp.client;
 
+import com.fasterxml.jackson.core.type.TypeReference;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.xetax.crm.whatsapp.config.MetaWhatsAppProperties;
@@ -498,7 +499,14 @@ public class MetaWhatsAppClient {
         template.put("language", Map.of("code", language == null || language.isBlank() ? "en" : language));
         if (componentsJson != null && !componentsJson.isBlank()) {
             try {
-                template.put("components", objectMapper.readTree(componentsJson));
+                // Plain lists and maps, never a JsonNode. The request body is
+                // written by the application's own JSON mapper, which is not
+                // the one that parsed this string; it has no idea what a
+                // foreign tree is and wrote the node's getters out instead
+                // ("array":true,"nodeType":"ARRAY"…), so Meta rejected every
+                // template that carried components — an image header always.
+                template.put("components", objectMapper.readValue(componentsJson,
+                        new TypeReference<List<Map<String, Object>>>() { }));
             } catch (Exception e) {
                 return WhatsAppSendResult.failed("BAD_COMPONENTS", "Template parameters JSON is invalid.");
             }

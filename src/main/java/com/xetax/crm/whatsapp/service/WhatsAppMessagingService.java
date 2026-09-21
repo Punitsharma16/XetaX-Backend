@@ -522,7 +522,14 @@ public class WhatsAppMessagingService {
         if (message == null) return;
         if (result.success()) {
             message.setStatus(WhatsAppMessageStatus.SENT);
-            message.setProviderMessageId(result.providerMessageId());
+            // Meta hands back the same id when it recognises a retry as the
+            // message it already took — our own client retries a timeout, so
+            // this really happens. The id is unique here, and letting the
+            // duplicate through failed the whole dispatch: the customer had
+            // the message and the CRM called it FAILED (a 409 on the send,
+            // before dispatch moved off the request thread). The id stays on
+            // the row that first carried it; this one is simply sent.
+            message.setProviderMessageId(unusedProviderId(result.providerMessageId(), message.getId()));
             message.setSentAt(Instant.now());
             meterRegistry.counter("whatsapp.messages.sent").increment();
         } else {
@@ -546,6 +553,20 @@ public class WhatsAppMessagingService {
             message.setErrorMessage(clamp(errorMessage, 500));
             messageRepository.save(message);
         });
+    }
+
+    /**
+     * The provider id to store, or null when another message already carries
+     * it. Status webhooks then keep matching the row that got there first,
+     * which is the same message as far as the customer is concerned.
+     */
+    private String unusedProviderId(String providerMessageId, Long messageId) {
+        if (providerMessageId == null || providerMessageId.isBlank()) return providerMessageId;
+        WhatsAppMessage existing = messageRepository.findByProviderMessageId(providerMessageId).orElse(null);
+        if (existing == null || existing.getId().equals(messageId)) return providerMessageId;
+        log.info("Meta returned provider id {} again (already on message {}) — keeping it there "
+                + "and marking message {} sent", providerMessageId, existing.getId(), messageId);
+        return null;
     }
 
     /**

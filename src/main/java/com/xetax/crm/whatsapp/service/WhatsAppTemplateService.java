@@ -58,12 +58,26 @@ public class WhatsAppTemplateService {
             try {
                 template.setComponentsJson(objectMapper.writeValueAsString(node.path("components")));
             } catch (Exception ignored) { }
+            // Meta's own answer says what the header is. Without reading it a
+            // synced template looked header-less: the picture stored against it
+            // was never attached to a send, and the preview showed none.
+            template.setHeaderFormat(headerFormatOf(node.path("components")));
             template.setSyncedAt(Instant.now());
             templateRepository.save(template);
             count++;
         }
         indexTemplateSummary(config, count);
         return count;
+    }
+
+    /** IMAGE, VIDEO, DOCUMENT, TEXT — or NONE when the template has no header. */
+    private static String headerFormatOf(JsonNode components) {
+        for (JsonNode component : components) {
+            if (!"HEADER".equalsIgnoreCase(component.path("type").asText(""))) continue;
+            String format = component.path("format").asText("TEXT");
+            return format.isBlank() ? "TEXT" : format.toUpperCase();
+        }
+        return "NONE";
     }
 
     public List<WhatsAppTemplateResponse> myTemplates() {

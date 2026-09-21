@@ -33,6 +33,7 @@ import java.util.Optional;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
+import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyLong;
@@ -184,6 +185,50 @@ class OutboundDispatchTest {
         service.send(templateSend());
 
         verify(proxy, times(1)).dispatchAsync(eq(99L), anyString());
+    }
+
+    /**
+     * Meta answers a retried send with the id it already gave — our own client
+     * retries a timeout, so this arrives in the ordinary course of business.
+     * The id is unique in our table, and letting the duplicate through failed
+     * the whole dispatch: the customer had the message and the CRM called it
+     * FAILED (and, before dispatch moved off the request thread, answered the
+     * send with 409 CONFLICT).
+     */
+    @Test
+    void aProviderIdMetaHasAlreadyGivenUsDoesNotFailTheSend() {
+        WhatsAppMessage earlier = WhatsAppMessage.builder()
+                .ownerUserId(OWNER).whatsappConfigId(7L)
+                .status(WhatsAppMessageStatus.SENT).providerMessageId("wamid.SAME").build();
+        earlier.setId(50L);
+        WhatsAppMessage retried = WhatsAppMessage.builder()
+                .ownerUserId(OWNER).whatsappConfigId(7L)
+                .status(WhatsAppMessageStatus.QUEUED).build();
+        retried.setId(99L);
+        queued = retried;
+        when(messages.findByProviderMessageId("wamid.SAME")).thenReturn(Optional.of(earlier));
+
+        service.applySendResult(99L, WhatsAppSendResult.ok("wamid.SAME"));
+
+        assertEquals(WhatsAppMessageStatus.SENT, retried.getStatus());
+        // The id stays where it landed first, so status webhooks still match.
+        assertNull(retried.getProviderMessageId());
+        assertEquals("wamid.SAME", earlier.getProviderMessageId());
+    }
+
+    @Test
+    void anIdNobodyElseHasIsKept() {
+        WhatsAppMessage message = WhatsAppMessage.builder()
+                .ownerUserId(OWNER).whatsappConfigId(7L)
+                .status(WhatsAppMessageStatus.QUEUED).build();
+        message.setId(99L);
+        queued = message;
+        when(messages.findByProviderMessageId("wamid.NEW")).thenReturn(Optional.empty());
+
+        service.applySendResult(99L, WhatsAppSendResult.ok("wamid.NEW"));
+
+        assertEquals("wamid.NEW", message.getProviderMessageId());
+        assertEquals(WhatsAppMessageStatus.SENT, message.getStatus());
     }
 
     /**
