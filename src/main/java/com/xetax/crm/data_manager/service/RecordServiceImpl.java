@@ -131,7 +131,7 @@ public class RecordServiceImpl implements RecordService{
     @Override
     public RecordResponse getById(String id) {
         RecordDocument record = recordRepo.findById(id).orElseThrow(
-                ()-> new ResourceNotFoundException("Record Not Field"));
+                ()-> new ResourceNotFoundException("Record not found"));
         ownershipGuard.requireOwnedForm(record.getFormId());
         assertVisible(record);
         return mapper.toResponse(record);
@@ -388,7 +388,7 @@ public class RecordServiceImpl implements RecordService{
     private void requireOrgMember(String userId) {
         if (userId == null || !teamService.isInMyOrg(userId)) {
             throw new com.xetax.crm.common.exception.BadRequestException(
-                    "Target user aapki team ka member nahi hai");
+                    "That user is not a member of your team");
         }
     }
 }

@@ -74,18 +74,24 @@ public class AiChatController {
         quotaService.consumeAssistant(userId.toString());
 
         var emitter = new org.springframework.web.servlet.mvc.method.annotation.SseEmitter(120_000L);
-        aiChatService.chatStream(chatRequestDto.conversationId(), chatRequestDto.message(), userId)
-                .subscribe(
-                        token -> {
-                            try {
-                                emitter.send(org.springframework.web.servlet.mvc.method.annotation.SseEmitter
-                                        .event().data(token));
-                            } catch (Exception e) {
-                                emitter.completeWithError(e);
-                            }
-                        },
-                        emitter::completeWithError,
-                        emitter::complete);
+        /*
+         * Answered on this thread, where the signed-in user still is.
+         *
+         * The token-by-token variant hands the model call to Reactor, and the
+         * assistant's tools then run on a pool thread with an empty
+         * SecurityContext: every tool reported "your role does not allow
+         * this", so the owner was told the assistant could not read their own
+         * records. Restoring the stream needs the security context carried
+         * into those threads first.
+         */
+        try {
+            emitter.send(org.springframework.web.servlet.mvc.method.annotation.SseEmitter.event()
+                    .data(aiChatService.chat(chatRequestDto.conversationId(),
+                            chatRequestDto.message(), userId)));
+            emitter.complete();
+        } catch (Exception e) {
+            emitter.completeWithError(e);
+        }
         return emitter;
     }
 

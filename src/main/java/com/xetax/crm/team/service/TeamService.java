@@ -59,11 +59,11 @@ public class TeamService {
     public Map<String, Object> createRole(String name, List<String> permissions) {
         String owner = ownerId();
         if (name == null || name.isBlank()) {
-            throw new BadRequestException("Role ka naam zaroori hai");
+            throw new BadRequestException("A role needs a name");
         }
         String cleanName = name.trim().toUpperCase().replaceAll("\\s+", "_");
         if (roleRepository.findByOwnerUserIdAndNameIgnoreCase(owner, cleanName).isPresent()) {
-            throw new BadRequestException("Is naam ka role pehle se hai");
+            throw new BadRequestException("A role with this name already exists");
         }
         OrgRole role = roleRepository.save(OrgRole.builder()
                 .ownerUserId(owner)
@@ -78,7 +78,7 @@ public class TeamService {
     public Map<String, Object> updateRole(Long roleId, String name, List<String> permissions) {
         OrgRole role = requireRole(roleId);
         if (role.isSystemRole()) {
-            throw new BadRequestException("ADMIN role change nahi ho sakta");
+            throw new BadRequestException("The ADMIN role cannot be changed");
         }
         if (name != null && !name.isBlank()) {
             role.setName(name.trim().toUpperCase().replaceAll("\\s+", "_"));
@@ -95,11 +95,11 @@ public class TeamService {
     public void deleteRole(Long roleId) {
         OrgRole role = requireRole(roleId);
         if (role.isSystemRole()) {
-            throw new BadRequestException("ADMIN role delete nahi ho sakta");
+            throw new BadRequestException("The ADMIN role cannot be deleted");
         }
         if (memberRoleRepository.countByRoleId(roleId) > 0) {
             throw new BadRequestException(
-                    "Is role par members hain — pehle unka role badlo, phir delete karo");
+                    "Members still hold this role — move them to another role first");
         }
         roleRepository.delete(role);
     }
@@ -136,7 +136,7 @@ public class TeamService {
         String owner = ownerId();
         OrgRole role = requireRole(roleId);
         if (password == null || password.length() < 6) {
-            throw new BadRequestException("Password kam se kam 6 characters ka ho");
+            throw new BadRequestException("The password needs at least 6 characters");
         }
         AuthUserDto dto = new AuthUserDto();
         dto.setName(name);
@@ -249,7 +249,7 @@ public class TeamService {
         try {
             return objectMapper.writeValueAsString(valid);
         } catch (Exception e) {
-            throw new BadRequestException("Permissions parse nahi hui");
+            throw new BadRequestException("Those permissions could not be read");
         }
     }
 

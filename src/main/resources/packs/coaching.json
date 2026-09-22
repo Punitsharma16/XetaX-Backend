@@ -10,8 +10,8 @@
     "fees"
   ],
   "language": "hinglish",
-  "tagline": "Enquiry se admission tak, fee reminder ke saath",
-  "description": "Coaching institutes, schools aur online courses ke liye: admission enquiries, demo class, batch allotment aur fee follow-up ek jagah.",
+  "tagline": "From enquiry to admission, fee reminders included",
+  "description": "For coaching institutes, schools and online courses: admission enquiries, demo classes, batch allotment and fee follow-ups in one place.",
   "fields": [
     {
       "label": "Student Name",
@@ -128,7 +128,7 @@
       "actionType": "SEND_WHATSAPP",
       "actionFieldKey": "phone",
       "emailMessage": "Hi {student_name}'s family! Thanks for enquiring about {course}. Our counsellor will call you shortly — or reply here with a good time.",
-      "note": "Pehla message turant — trust banta hai"
+      "note": "The first message goes out at once, which builds trust"
     },
     {
       "name": "Demo booked confirmation",
@@ -137,7 +137,7 @@
       "actionType": "SEND_WHATSAPP",
       "actionFieldKey": "phone",
       "emailMessage": "Demo class confirmed for {student_name} on {demo_date}. Batch: {batch}. See you there!",
-      "note": "Demo stage par confirmation"
+      "note": "A confirmation at the demo stage"
     },
     {
       "name": "Admission task for counsellor",
@@ -147,7 +147,7 @@
       "actionValue": "Collect documents & fee receipt — {student_name}",
       "emailMessage": "Course: {course}, Fee: {fee}",
       "emailSubject": "48",
-      "note": "Admission ke baad paperwork ka task"
+      "note": "A paperwork task once the admission is done"
     }
   ],
   "whatsappTemplates": [

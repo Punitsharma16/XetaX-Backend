@@ -3,8 +3,8 @@
   "name": "Inventory / Procurement",
   "icon": "bi-box-seam",
   "color": "#0891b2",
-  "tagline": "Stock request se shelf tak",
-  "description": "Purchase requests approve karo, orders track karo, aur stock apne aap update hota rahe.",
+  "tagline": "From stock request to shelf",
+  "description": "Approve purchase requests, track orders and let stock update itself.",
   "fields": [
     {
       "label": "Item Name",
@@ -132,7 +132,7 @@
       "actionValue": null,
       "emailSubject": "Purchase Order - {item_name}",
       "emailMessage": "Order: {quantity} x {item_name} (SKU {sku}). Kindly confirm delivery date.",
-      "note": "Ordered stage par supplier ko PO email"
+      "note": "A purchase-order email to the supplier at the ordered stage"
     },
     {
       "name": "Stock update on receive",
@@ -144,19 +144,7 @@
       "actionValue": "1",
       "emailSubject": null,
       "emailMessage": null,
-      "note": "Received par stock badhao (quantity apne hisaab se adjust karein)"
-    },
-    {
-      "name": "Supplier delay reminder",
-      "trigger": "STATUS_CHANGED",
-      "triggerStageCode": "ORDERED",
-      "triggerStatusName": "Delayed",
-      "actionType": "SEND_EMAIL",
-      "actionFieldKey": "supplier_email",
-      "actionValue": null,
-      "emailSubject": "Reminder: PO pending - {item_name}",
-      "emailMessage": "Our order of {quantity} x {item_name} (SKU {sku}) is past the expected date. Please share the delivery status.",
-      "note": "Status 'Delayed' par supplier ko reminder email"
+      "note": "Raise stock on receipt — adjust the quantity to suit you"
     }
   ],
   "industry": "Procurement / Inventory",

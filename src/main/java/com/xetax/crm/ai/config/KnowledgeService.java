@@ -1,6 +1,7 @@
 package com.xetax.crm.ai.config;
 
 import com.xetax.crm.ai.model.KnowledgeMetadata;
+import lombok.extern.slf4j.Slf4j;
 import com.xetax.crm.ai.rag.ChunkingService;
 import org.springframework.ai.document.Document;
 import org.springframework.ai.vectorstore.SearchRequest;
@@ -14,6 +15,7 @@ import java.util.Map;
 
 
 @Service
+@Slf4j
 public class KnowledgeService {
 
     private final VectorStore vectorStore;
@@ -106,7 +108,16 @@ public class KnowledgeService {
                 .similarityThreshold(0.30)
                 .build();
 
-        return vectorStore.similaritySearch(request);
+        try {
+            List<Document> found = vectorStore.similaritySearch(request);
+            return found == null ? List.of() : found;
+        } catch (Exception e) {
+            // The knowledge base is an extra, not the assistant itself: it
+            // answers from the CRM's own data through its tools. A vector
+            // store that is down used to fail the whole request with 503.
+            log.warn("Knowledge search unavailable — answering without it: {}", e.getMessage());
+            return List.of();
+        }
     }
 
     public void deleteKnowledge(String knowledgeId) {

@@ -496,10 +496,16 @@ public class EmailCampaignService {
         long open = recipientRepository.countByCampaignIdAndStatusIn(campaignId,
                 List.of(EmailRecipientStatus.PENDING, EmailRecipientStatus.QUEUED));
         if (open > 0) return;
+        // Counted from the recipient rows, for the same reason as the WhatsApp
+        // campaign: the campaign's own tallies can be a step behind.
+        long failed = recipientRepository.countByCampaignIdAndStatusIn(campaignId,
+                List.of(EmailRecipientStatus.FAILED));
+        long sent = recipientRepository.countByCampaignIdAndStatusIn(campaignId,
+                List.of(EmailRecipientStatus.SENT));
         campaignRepository.findById(campaignId).ifPresent(campaign -> {
             if (campaign.getStatus() != EmailCampaignStatus.RUNNING) return;
-            campaign.setStatus(campaign.getFailedCount() > 0
-                    ? (campaign.getSentCount() > 0 ? EmailCampaignStatus.PARTIAL : EmailCampaignStatus.FAILED)
+            campaign.setStatus(failed > 0
+                    ? (sent > 0 ? EmailCampaignStatus.PARTIAL : EmailCampaignStatus.FAILED)
                     : EmailCampaignStatus.COMPLETED);
             campaign.setCompletedAt(Instant.now());
             campaignRepository.save(campaign);

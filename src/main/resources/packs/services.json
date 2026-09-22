@@ -10,8 +10,8 @@
     "service call"
   ],
   "language": "hinglish",
-  "tagline": "Complaint se service visit aur AMC renewal tak",
-  "description": "AC / appliance repair, pest control, cleaning, plumbing, solar — service requests, technician visits, payment aur AMC renewal reminders.",
+  "tagline": "From complaint to service visit and AMC renewal",
+  "description": "AC and appliance repair, pest control, cleaning, plumbing, solar — service requests, technician visits, payments and AMC renewal reminders.",
   "fields": [
     {
       "label": "Customer Name",
@@ -126,7 +126,7 @@
       "actionType": "SEND_WHATSAPP",
       "actionFieldKey": "phone",
       "emailMessage": "Hi {customer_name}, we've received your {service_type} request. We'll confirm the technician visit slot shortly.",
-      "note": "Turant acknowledgement"
+      "note": "An immediate acknowledgement"
     },
     {
       "name": "Visit scheduled message",
@@ -144,7 +144,7 @@
       "actionType": "SEND_WHATSAPP",
       "actionFieldKey": "phone",
       "emailMessage": "Service done! Amount due: ₹{estimate}. You can pay via UPI or cash to the technician. Thank you!",
-      "note": "Payment stage par reminder"
+      "note": "A reminder at the payment stage"
     }
   ],
   "whatsappTemplates": [

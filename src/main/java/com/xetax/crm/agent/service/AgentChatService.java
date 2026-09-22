@@ -53,7 +53,7 @@ public class AgentChatService {
         return Map.of(
                 "name", agent.getName(),
                 "welcomeMessage", agent.getWelcomeMessage() == null
-                        ? "Hi! Main aapki kaise help kar sakta hoon?" : agent.getWelcomeMessage(),
+                        ? "Hi! How can I help you today?" : agent.getWelcomeMessage(),
                 "themeColor", agent.getThemeColor() == null ? "#4f46e5" : agent.getThemeColor()
         );
     }

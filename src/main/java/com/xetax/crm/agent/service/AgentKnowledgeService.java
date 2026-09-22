@@ -42,13 +42,13 @@ public class AgentKnowledgeService {
             String text = new PDFTextStripper().getText(pdf);
             if (text == null || text.isBlank()) {
                 throw new BadRequestException(
-                        "PDF me koi text nahi mila — scanned/image PDF abhi supported nahi hai");
+                        "No text in that PDF — scanned or image-only PDFs are not supported yet");
             }
             return text;
         } catch (BadRequestException e) {
             throw e;
         } catch (Exception e) {
-            throw new BadRequestException("PDF padha nahi ja saka: " + e.getMessage());
+            throw new BadRequestException("The PDF could not be read: " + e.getMessage());
         }
     }
 
@@ -62,8 +62,8 @@ public class AgentKnowledgeService {
             String text = (page.title() + "\n\n" + page.body().text()).trim();
             if (text.length() < 50) {
                 throw new BadRequestException(
-                        "Page se kaafi text nahi mila (JavaScript-rendered site ho sakti hai) — "
-                        + "content copy karke Manual text se add karo");
+                        "Not enough text on that page (it may be rendered by JavaScript) — "
+                        + "copy the content and add it as manual text");
             }
             return text;
         } catch (BadRequestException e) {

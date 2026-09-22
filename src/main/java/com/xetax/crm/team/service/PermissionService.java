@@ -72,7 +72,7 @@ public class PermissionService {
     public void requireAny(String... permissionKeys) {
         if (!hasAny(permissionKeys)) {
             throw new ResponseStatusException(HttpStatus.FORBIDDEN,
-                    "Aapke role me ye permission nahi hai — apne admin se baat karo.");
+                    "Your role does not allow this — ask the workspace owner for access.");
         }
     }
 
@@ -91,8 +91,8 @@ public class PermissionService {
     public void require(String permissionKey) {
         if (!has(permissionKey)) {
             throw new ResponseStatusException(HttpStatus.FORBIDDEN,
-                    "Aapke role me ye permission nahi hai (" + permissionKey
-                            + ") — apne admin se baat karo.");
+                    "Your role does not allow this (" + permissionKey
+                            + ") — ask the workspace owner for access.");
         }
     }
 

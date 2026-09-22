@@ -6,8 +6,8 @@
   "industry": "Salon / Spa",
   "tags": ["appointments", "stylists", "slots"],
   "language": "hinglish",
-  "tagline": "Slot chuna, booking hui, record ban gaya",
-  "description": "Hair salon, barber shop aur spa ke liye: apne stylists ke slots banao, customer WhatsApp, bot ya booking page se sirf khali slot chun sakta hai, aur har booking ka record apne aap ban jata hai.",
+  "tagline": "Slot picked, booking made, record created",
+  "description": "For hair salons, barber shops and spas: set up your stylists' slots, let customers pick only a free slot over WhatsApp, the bot or the booking page, and every booking becomes a record on its own.",
   "fields": [
     {
       "label": "Customer Name",
@@ -146,7 +146,7 @@
       "actionValue": null,
       "emailSubject": null,
       "emailMessage": "{customer_name} ji, aapki booking mil gayi — {appointment_date} ko {slot_time} baje, {stylist} ke saath. Jald confirm karte hain. ✂️",
-      "note": "Slot book hote hi customer ko confirmation"
+      "note": "A confirmation to the customer as soon as the slot is booked"
     },
     {
       "name": "Booking confirmed",
@@ -158,7 +158,7 @@
       "actionValue": null,
       "emailSubject": null,
       "emailMessage": "{customer_name} ji, aapki appointment confirm hai — {appointment_date}, {slot_time}. Milte hain!",
-      "note": "Confirm karte hi customer ko pakka message"
+      "note": "A firm confirmation to the customer once the booking is confirmed"
     },
     {
       "name": "Thank you after the visit",
@@ -170,7 +170,7 @@
       "actionValue": null,
       "emailSubject": null,
       "emailMessage": "Thank you {customer_name} ji! Kaisa laga? 1-5 me rating bhej dijiye. 💇",
-      "note": "Visit ke baad feedback"
+      "note": "Feedback after the visit"
     },
     {
       "name": "Cancelled — slot free",
@@ -182,7 +182,7 @@
       "actionValue": null,
       "emailSubject": null,
       "emailMessage": "{customer_name} ji, aapki booking cancel kar di gayi hai. Nayi booking kabhi bhi kar sakte hain.",
-      "note": "Cancel hone par customer ko batao"
+      "note": "Tell the customer when a booking is cancelled"
     }
   ],
   "whatsappTemplates": [

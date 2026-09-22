@@ -3,8 +3,8 @@
   "name": "Restaurant Orders",
   "icon": "bi-shop",
   "color": "#ea580c",
-  "tagline": "Order aaya, bana, pahucha — sab track",
-  "description": "Har order ki live journey — kitchen se customer tak, WhatsApp updates ke saath.",
+  "tagline": "Ordered, cooked, delivered — all tracked",
+  "description": "Every order's journey live, from kitchen to customer, with WhatsApp updates.",
   "fields": [
     {
       "label": "Customer Name",
@@ -138,7 +138,7 @@
       "actionValue": null,
       "emailSubject": null,
       "emailMessage": "Order mil gaya! Total: Rs {amount}. Jald confirm karte hain. 🍽️",
-      "note": "Order aate hi customer ko confirmation"
+      "note": "A confirmation to the customer as soon as the order arrives"
     },
     {
       "name": "Order ready",
@@ -150,31 +150,7 @@
       "actionValue": null,
       "emailSubject": null,
       "emailMessage": "{customer_name} ji, aapka order ready hai!",
-      "note": "Ready hote hi customer ko message"
-    },
-    {
-      "name": "Order delayed - sorry",
-      "trigger": "STATUS_CHANGED",
-      "triggerStageCode": "PREPARING",
-      "triggerStatusName": "Delayed",
-      "actionType": "SEND_WHATSAPP",
-      "actionFieldKey": "phone",
-      "actionValue": null,
-      "emailSubject": null,
-      "emailMessage": "{customer_name} ji, order me thoda extra time lag raha hai — jaldi hi ready hoga. Sorry! 🙏",
-      "note": "Status 'Delayed' par customer ko pehle hi bata do"
-    },
-    {
-      "name": "Out for delivery",
-      "trigger": "STATUS_CHANGED",
-      "triggerStageCode": "READY",
-      "triggerStatusName": "Out for Delivery",
-      "actionType": "SEND_WHATSAPP",
-      "actionFieldKey": "phone",
-      "actionValue": null,
-      "emailSubject": null,
-      "emailMessage": "{customer_name} ji, aapka order raste me hai! 🛵",
-      "note": "Delivery nikalte hi live update"
+      "note": "A message to the customer as soon as it is ready"
     }
   ],
   "industry": "Restaurant / Food",

@@ -4,6 +4,7 @@ package com.xetax.crm.ai.config;
 import com.xetax.crm.ai.tools.AutomationTools;
 import com.xetax.crm.ai.tools.FormFieldTools;
 import com.xetax.crm.ai.tools.FormTools;
+import com.xetax.crm.ai.tools.ContactTools;
 import com.xetax.crm.ai.tools.RecordTools;
 import com.xetax.crm.ai.tools.StageTools;
 import com.xetax.crm.whatsapp.tools.WhatsAppTools;
@@ -28,7 +29,7 @@ import java.util.Map;
 public class AiConfig {
 
     @Bean
-    public ChatClient chatClient(ChatClient.Builder builder , MessageChatMemoryAdvisor messageChatMemoryAdvisor , FormTools formTools , FormFieldTools formFieldTools , StageTools stageTools , AutomationTools automationTools , RecordTools recordTools , WhatsAppTools whatsAppTools , MeetingTools meetingTools , TeamTools teamTools , AgentTools agentTools) {
+    public ChatClient chatClient(ChatClient.Builder builder , MessageChatMemoryAdvisor messageChatMemoryAdvisor , FormTools formTools , FormFieldTools formFieldTools , StageTools stageTools , AutomationTools automationTools , RecordTools recordTools , ContactTools contactTools , WhatsAppTools whatsAppTools , MeetingTools meetingTools , TeamTools teamTools , AgentTools agentTools) {
         return builder
                 /*
                  * Kept deliberately compact: this prompt travels with EVERY
@@ -53,6 +54,7 @@ public class AiConfig {
                     - If a tool says not found for this user, say you could not find it in their account — never speculate about other users' data. If an operation fails (duplicate slug/field key/stage code, validation), relay the reason and ask how to proceed.
                     - Don't mention internal ids (formId, field/stage ids) unless the user asks.
                     - HINDI/HINGLISH: words like ek, mera, meri, wala, wali, naya, ka, ki, ke, form, banao are sentence words, NOT part of names — "Ek Real Estate form banao" means the name is "Real Estate". Ask if the intended name is unclear.
+                    - CONTACTS (contacts.view): getMyContacts/searchMyContacts read the user's address book — counts, lists and lookups by name, number, email or company. Read-only: to message or edit a contact, point the user at the Contacts page.
                     - WHATSAPP: read tools (status/templates/campaigns) work like other read tools. sendWhatsAppMessage ONLY when the user explicitly asks to send a message NOW — confirm number and exact text first, never proactively. createWhatsAppCampaignDraft creates a DRAFT only; NEVER start a campaign — the user starts it from the Campaigns page. Never reveal tokens or webhook internals.
                     - MEETINGS: createMeeting makes an instant or scheduled video meeting and returns the guest link. sendMeetingLink ONLY on explicit user request — channel WHATSAPP needs WhatsApp connected (else offer EMAIL). Never invent meeting times; if the user says a relative time (kal 3 baje) convert it, and when ambiguous ask.
                     - TEAM & ROLES: team tools need the team.manage permission (owners always have it). createTeamRole/createTeamMember/changeMemberRole/transferAllRecords ONLY on explicit request — for roles confirm the exact permission keys first (getPermissionCatalog), for members return the one-time temporary password to the user. If a tool returns a permission error, tell the user their role doesn't allow it.
@@ -74,7 +76,7 @@ public class AiConfig {
                                         )
                                 )
                 )
-                .defaultTools(formTools, formFieldTools, stageTools, automationTools, recordTools, whatsAppTools, meetingTools, teamTools, agentTools)
+                .defaultTools(formTools, formFieldTools, stageTools, automationTools, recordTools, contactTools, whatsAppTools, meetingTools, teamTools, agentTools)
                 .defaultAdvisors(new SimpleLoggerAdvisor() , messageChatMemoryAdvisor)
                 .build();
     }

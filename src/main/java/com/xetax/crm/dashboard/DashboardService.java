@@ -117,7 +117,7 @@ public class DashboardService {
         long waSent7d = waConnected ? whatsAppMessageRepository
                 .countByOwnerUserIdAndDirectionAndCreatedAtGreaterThanEqual(owner, MessageDirection.OUTBOUND, weekAgo) : 0;
         out.put("whatsapp", Map.of("connected", waConnected, "sent7d", waSent7d));
-        out.put("emailConfigured", orgSmtpService.isConfiguredFor(owner));
+        out.put("emailConfigured", orgSmtpService.hasOwnSettings(owner));
 
         // ------------------------------------------- pipelines (top 4 forms)
         List<Map<String, Object>> pipelines = new ArrayList<>();

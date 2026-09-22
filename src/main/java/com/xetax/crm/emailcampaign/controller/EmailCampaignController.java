@@ -28,12 +28,25 @@ import java.util.Map;
 public class EmailCampaignController {
 
     private final EmailCampaignService campaignService;
+    private final com.xetax.crm.emailcampaign.service.EmailCampaignAiService aiService;
+    private final com.xetax.crm.auth.security.CurrentUserProvider currentUserProvider;
 
     /** Is the org's own SMTP set up (the only sender campaigns use), plus the pacing limits. */
     @GetMapping("/status")
     @RequiresPermission("email.campaigns")
     public ApiResponse<Map<String, Object>> status() {
         return ResponseUtil.success("Email campaign status", campaignService.status());
+    }
+
+    public record AiDraftRequest(String prompt, java.util.List<String> placeholders) {}
+
+    /** One sentence about the offer in, a subject line and a message out. */
+    @PostMapping("/ai-draft")
+    @RequiresPermission("email.campaigns")
+    public ApiResponse<Map<String, Object>> aiDraft(@RequestBody AiDraftRequest request) {
+        var owner = currentUserProvider.currentDataOwnerIdOrNull();
+        return ResponseUtil.success("Draft ready", aiService.draft(owner == null ? "" : owner.toString(),
+                request.prompt(), request.placeholders()));
     }
 
     @PostMapping

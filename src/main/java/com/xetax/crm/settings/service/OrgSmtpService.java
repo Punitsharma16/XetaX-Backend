@@ -52,7 +52,7 @@ public class OrgSmtpService {
     private void requireAdmin() {
         if (!permissionService.isAdmin()) {
             throw new ResponseStatusException(HttpStatus.FORBIDDEN,
-                    "Email settings sirf admin badal sakta hai.");
+                    "Only an admin can change the email settings.");
         }
     }
 
@@ -72,7 +72,7 @@ public class OrgSmtpService {
     public Map<String, Object> save(String host, Integer port, String username, String password) {
         requireAdmin();
         if (host == null || host.isBlank() || username == null || username.isBlank()) {
-            throw new BadRequestException("SMTP host aur username (email) dono zaroori hain");
+            throw new BadRequestException("Both the SMTP host and the username (email) are required");
         }
         String owner = ownerId();
         OrgSmtpSettings settings = repository.findByOwnerUserId(owner)
@@ -83,7 +83,7 @@ public class OrgSmtpService {
         if (password != null && !password.isBlank()) {
             settings.setPasswordEncrypted(encryption.encrypt(password));
         } else if (settings.getPasswordEncrypted() == null) {
-            throw new BadRequestException("Password zaroori hai (pehli baar set karte waqt)");
+            throw new BadRequestException("A password is required the first time you set this up");
         }
         repository.save(settings);
         senderCache.remove(owner);
@@ -103,11 +103,11 @@ public class OrgSmtpService {
         requireAdmin();
         String owner = ownerId();
         if (!isConfiguredFor(owner)) {
-            throw new BadRequestException("Pehle SMTP settings save karo");
+            throw new BadRequestException("Save your SMTP settings first");
         }
         try {
             sendAs(owner, toEmail, "XetaX test email",
-                    "Ye ek test email hai — aapki email settings sahi kaam kar rahi hain! ✅");
+                    "This is a test email — your email settings are working. \u2705");
             return Map.of("sent", true, "to", toEmail);
         } catch (Exception e) {
             return Map.of("sent", false, "error", rootMessage(e));
@@ -116,9 +116,19 @@ public class OrgSmtpService {
 
     /* ---------------------------------------------- org-aware send engine */
 
+    /** Can anything at all be sent for this workspace (its own SMTP, or ours)? */
     public boolean isConfiguredFor(String ownerUserId) {
-        return repository.findByOwnerUserId(ownerUserId).isPresent()
-                || emailService.isConfigured();
+        return hasOwnSettings(ownerUserId) || emailService.isConfigured();
+    }
+
+    /**
+     * Does this workspace send as ITS OWN address? Campaigns need that, and so
+     * does anyone reading "Email — sending as your address" on the dashboard:
+     * counting the platform's fallback there told owners they were set up
+     * while the campaign page refused them for having no sender.
+     */
+    public boolean hasOwnSettings(String ownerUserId) {
+        return repository.findByOwnerUserId(ownerUserId).isPresent();
     }
 
     /** Org ki SMTP se bhejo; org ne set nahi ki to global .env wali (agar ho). */

@@ -25,12 +25,12 @@ public interface EmailCampaignRepository extends JpaRepository<EmailCampaign, Lo
     /* Atomic counter moves — safe under concurrent Kafka consumers. */
 
     @Transactional
-    @Modifying
+    @Modifying(flushAutomatically = true, clearAutomatically = true)
     @Query("UPDATE EmailCampaign c SET c.sentCount = c.sentCount + 1, c.queuedCount = c.queuedCount - 1 WHERE c.id = :id")
     int markOneSent(@Param("id") Long id);
 
     @Transactional
-    @Modifying
+    @Modifying(flushAutomatically = true, clearAutomatically = true)
     @Query("UPDATE EmailCampaign c SET c.failedCount = c.failedCount + 1, c.queuedCount = c.queuedCount - 1 WHERE c.id = :id")
     int markOneFailed(@Param("id") Long id);
 }

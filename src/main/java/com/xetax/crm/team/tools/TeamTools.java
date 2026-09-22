@@ -83,8 +83,8 @@ public class TeamTools {
             Map<String, Object> created =
                     new LinkedHashMap<>(teamService.createMember(name, email, tempPassword, roleId));
             created.put("temporaryPassword", tempPassword);
-            created.put("note", "Ye password sirf ek baar dikh raha hai — member ko dekar "
-                    + "pehle login par change karwa lena.");
+            created.put("note", "This password is shown once — give it to the member and "
+                    + "have them change it on their first login.");
             return created;
         } catch (Exception e) {
             return Map.of("error", safeMessage(e));
@@ -143,6 +143,6 @@ public class TeamTools {
 
     private static String safeMessage(Exception e) {
         String message = e.getMessage();
-        return message == null || message.isBlank() ? "Action fail ho gaya." : message;
+        return message == null || message.isBlank() ? "That action did not go through." : message;
     }
 }

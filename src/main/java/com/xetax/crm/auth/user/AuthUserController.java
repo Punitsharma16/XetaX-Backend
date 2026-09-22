@@ -39,22 +39,26 @@ public class AuthUserController {
         userDto.setAdmin(false);
         userDto.setEnable(true);
         userDto.setParentId(null);
-        // Email must be confirmed before the first sign-in (only when SMTP can
-        // actually deliver the code — otherwise the account is live at once).
-        boolean mustVerify = verificationService.verificationRequired();
-        userDto.setEmailVerified(!mustVerify);
 
-        AuthUserDto created = userService.createUser(userDto);
-        if (mustVerify) {
-            try {
-                verificationService.sendCode(created.getEmail() == null ? "" : created.getEmail().trim().toLowerCase());
-            } catch (Exception e) {
-                // Account exists; the verify page offers "Send it again".
-                org.slf4j.LoggerFactory.getLogger(AuthUserController.class)
-                        .warn("Verification code not sent for {}: {}", created.getEmail(), e.getMessage());
-            }
+        // With a mail server in place nothing is written to the users table
+        // yet: the sign-up waits for the code. An address typed wrongly, or
+        // one belonging to somebody else, used to leave a real account behind
+        // that nobody could use and that held the email and phone number.
+        if (!verificationService.verificationRequired()) {
+            userDto.setEmailVerified(true);
+            return ResponseEntity.status(HttpStatus.CREATED).body(userService.createUser(userDto));
         }
-        return ResponseEntity.status(HttpStatus.CREATED).body(created);
+
+        String email = verificationService.startSignup(userDto);
+
+        // The panel reads emailVerified=false and sends the person to the
+        // "enter the code" page; there is no account to describe yet.
+        AuthUserDto pending = new AuthUserDto();
+        pending.setEmail(email);
+        pending.setName(userDto.getName());
+        pending.setEmailVerified(false);
+        pending.setEnable(true);
+        return ResponseEntity.status(HttpStatus.CREATED).body(pending);
     }
 
     /**

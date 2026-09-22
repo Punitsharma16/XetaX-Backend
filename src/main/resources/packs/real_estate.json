@@ -3,8 +3,8 @@
   "name": "Real Estate Leads",
   "icon": "bi-buildings",
   "color": "#16a34a",
-  "tagline": "Site visit se registry tak ka safar",
-  "description": "Property enquiries manage karo — budget, location, site visits aur booking sab ek jagah.",
+  "tagline": "The journey from site visit to registry",
+  "description": "Manage property enquiries — budget, location, site visits and booking in one place.",
   "fields": [
     {
       "label": "Client Name",
@@ -143,7 +143,7 @@
       "actionValue": null,
       "emailSubject": null,
       "emailMessage": "Namaste {client_name} ji! Aapki property enquiry mili — {property_type}, {location}. Team jald call karegi.",
-      "note": "Enquiry aate hi welcome"
+      "note": "A welcome as soon as the enquiry arrives"
     },
     {
       "name": "Site visit reminder",
@@ -155,31 +155,7 @@
       "actionValue": null,
       "emailSubject": null,
       "emailMessage": "{client_name} ji, aapki site visit {visit_date} ko scheduled hai. Milte hain!",
-      "note": "Site Visit stage par reminder"
-    },
-    {
-      "name": "No show - reschedule",
-      "trigger": "STATUS_CHANGED",
-      "triggerStageCode": "SITE_VISIT",
-      "triggerStatusName": "No Show",
-      "actionType": "SEND_WHATSAPP",
-      "actionFieldKey": "phone",
-      "actionValue": null,
-      "emailSubject": null,
-      "emailMessage": "{client_name} ji, aaj visit nahi ho payi — koi baat nahi! Naya time bata dein, hum arrange kar denge.",
-      "note": "Status 'No Show' par turant re-schedule nudge"
-    },
-    {
-      "name": "Visit feedback",
-      "trigger": "STATUS_CHANGED",
-      "triggerStageCode": "SITE_VISIT",
-      "triggerStatusName": "Visited",
-      "actionType": "SEND_WHATSAPP",
-      "actionFieldKey": "phone",
-      "actionValue": null,
-      "emailSubject": null,
-      "emailMessage": "{client_name} ji, property kaisi lagi? Pasand aayi ho to best offer ke liye batayein!",
-      "note": "Visit ke turant baad feedback + push"
+      "note": "A reminder at the site-visit stage"
     }
   ],
   "industry": "Real estate",

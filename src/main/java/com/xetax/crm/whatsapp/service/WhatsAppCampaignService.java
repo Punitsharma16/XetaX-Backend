@@ -430,10 +430,17 @@ public class WhatsAppCampaignService {
         long open = recipientRepository.countByCampaignIdAndStatusIn(campaignId,
                 List.of(RecipientStatus.PENDING, RecipientStatus.QUEUED));
         if (open > 0) return;
+        // The recipient rows are what the campaign page shows, so the closing
+        // status is counted from them. Reading the campaign's own tallies here
+        // called a campaign where every message failed "completed".
+        long failed = recipientRepository.countByCampaignIdAndStatusIn(campaignId,
+                List.of(RecipientStatus.FAILED));
+        long sent = recipientRepository.countByCampaignIdAndStatusIn(campaignId,
+                List.of(RecipientStatus.SENT, RecipientStatus.DELIVERED, RecipientStatus.READ));
         campaignRepository.findById(campaignId).ifPresent(campaign -> {
             if (campaign.getStatus() != CampaignStatus.RUNNING) return;
-            campaign.setStatus(campaign.getFailedCount() > 0
-                    ? (campaign.getSentCount() > 0 ? CampaignStatus.PARTIAL : CampaignStatus.FAILED)
+            campaign.setStatus(failed > 0
+                    ? (sent > 0 ? CampaignStatus.PARTIAL : CampaignStatus.FAILED)
                     : CampaignStatus.COMPLETED);
             campaign.setCompletedAt(Instant.now());
             campaignRepository.save(campaign);

@@ -56,6 +56,9 @@ public class FormServiceImpl implements FormService{
     com.xetax.crm.automation.repository.AutomationConditionRepository automationConditionRepository;
 
     @Autowired
+    com.xetax.crm.template.repository.PackInstallRepository packInstallRepository;
+
+    @Autowired
     com.xetax.crm.data_manager.repository.FormFieldRepo formFieldRepo;
 
     @Autowired
@@ -157,6 +160,11 @@ public class FormServiceImpl implements FormService{
         }
         stageRepo.deleteAll(stageRepo.findByFormIdOrderBySequence(id));
         formFieldRepo.deleteAll(formFieldRepo.findByFormIdOrderByDisplayOrder(id));
+        // A pack lives in its form. Leaving the install record behind kept the
+        // pack's own page (online menu, booking diary) in the sidebar and the
+        // gallery calling the pack installed, both pointing at a form that had
+        // just been deleted.
+        packInstallRepository.deleteByFormId(id);
         formRepo.delete(form);
         formOwnerCache.evict(id);
         // The form's cached children go with it — nothing should serve them.

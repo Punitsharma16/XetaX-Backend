@@ -3,8 +3,8 @@
   "name": "Customer Support Tickets",
   "icon": "bi-headset",
   "color": "#7c3aed",
-  "tagline": "Har complaint ka hisaab, har customer khush",
-  "description": "Tickets capture karo, priority par kaam karo, aur resolve hote hi customer ko batao.",
+  "tagline": "Every complaint accounted for, every customer happy",
+  "description": "Capture tickets, work by priority and tell the customer as soon as one is resolved.",
   "fields": [
     {
       "label": "Customer Name",
@@ -113,7 +113,7 @@
       "actionValue": null,
       "emailSubject": null,
       "emailMessage": "{customer_name} ji, aapki complaint register ho gayi hai. Team jald sampark karegi.",
-      "note": "Ticket bante hi confirmation"
+      "note": "A confirmation as soon as the ticket is raised"
     },
     {
       "name": "Resolved message",
@@ -125,31 +125,7 @@
       "actionValue": null,
       "emailSubject": null,
       "emailMessage": "{customer_name} ji, aapka issue resolve ho gaya hai. Dhanyavaad!",
-      "note": "Resolve hote hi customer ko khabar"
-    },
-    {
-      "name": "Escalation update",
-      "trigger": "STATUS_CHANGED",
-      "triggerStageCode": "IN_PROGRESS",
-      "triggerStatusName": "Escalated",
-      "actionType": "SEND_WHATSAPP",
-      "actionFieldKey": "phone",
-      "actionValue": null,
-      "emailSubject": null,
-      "emailMessage": "{customer_name} ji, aapka issue hamari senior team dekh rahi hai — jald update denge.",
-      "note": "Status 'Escalated' par customer ko bharosa"
-    },
-    {
-      "name": "Waiting - customer nudge",
-      "trigger": "STATUS_CHANGED",
-      "triggerStageCode": "WAITING",
-      "triggerStatusName": "No Response",
-      "actionType": "SEND_WHATSAPP",
-      "actionFieldKey": "phone",
-      "actionValue": null,
-      "emailSubject": null,
-      "emailMessage": "{customer_name} ji, aapke jawab ka intezar hai — reply milte hi hum aage badhenge.",
-      "note": "Status 'No Response' par yaad dilana"
+      "note": "The customer hears as soon as it is resolved"
     }
   ],
   "industry": "Customer support",

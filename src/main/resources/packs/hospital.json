@@ -3,8 +3,8 @@
   "name": "Hospital / Clinic (OPD)",
   "icon": "bi-heart-pulse",
   "color": "#dc2626",
-  "tagline": "Patient registration se discharge tak",
-  "description": "Patients register karo, appointments track karo, aur har step par unhe update rakho.",
+  "tagline": "From patient registration to discharge",
+  "description": "Register patients, track appointments and keep them updated at every step.",
   "fields": [
     {
       "label": "Patient Name",
@@ -129,7 +129,7 @@
       "actionValue": null,
       "emailSubject": null,
       "emailMessage": "{patient_name} ji, aapka registration ho gaya hai. Appointment: {appointment_date}.",
-      "note": "Register hote hi patient ko confirmation"
+      "note": "A confirmation to the patient as soon as they register"
     },
     {
       "name": "Lab instructions",
@@ -141,19 +141,7 @@
       "actionValue": null,
       "emailSubject": null,
       "emailMessage": "{patient_name} ji, lab test ke liye pahunchein. Reports ready hone par batayenge.",
-      "note": "Tests stage par instructions"
-    },
-    {
-      "name": "Report ready",
-      "trigger": "STATUS_CHANGED",
-      "triggerStageCode": "TESTS",
-      "triggerStatusName": "Report Ready",
-      "actionType": "SEND_WHATSAPP",
-      "actionFieldKey": "phone",
-      "actionValue": null,
-      "emailSubject": null,
-      "emailMessage": "{patient_name} ji, aapki report ready hai — collect kar sakte hain ya doctor se milein.",
-      "note": "Status 'Report Ready' hote hi patient ko khabar"
+      "note": "Instructions at the tests stage"
     }
   ],
   "industry": "Healthcare / Clinic",

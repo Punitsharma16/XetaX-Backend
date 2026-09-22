@@ -223,9 +223,9 @@ public class MeetingService {
             throw new BadRequestException("channel must be WHATSAPP or EMAIL");
         }
         if (email && !orgSmtpService.isConfiguredFor(meeting.getOwnerUserId())) {
-            throw new BadRequestException("Email abhi configured nahi hai — Profile → Email "
-                    + "settings me apna SMTP (Gmail app-password etc.) add karo, "
-                    + "ya WhatsApp/copy-link use karo.");
+            throw new BadRequestException("Email is not set up yet — add your SMTP under "
+                    + "Profile → Email settings (a Gmail app password works), "
+                    + "or share the link over WhatsApp instead.");
         }
 
         List<MeetingInvitee> targets = inviteeRepository
@@ -235,8 +235,8 @@ public class MeetingService {
                 .toList();
         if (targets.isEmpty()) {
             throw new BadRequestException(whatsapp
-                    ? "Kisi invitee ka phone number nahi hai"
-                    : "Kisi invitee ka email nahi hai");
+                    ? "No invitee has a phone number"
+                    : "No invitee has an email address");
         }
 
         List<String> sent = new ArrayList<>();
@@ -273,7 +273,7 @@ public class MeetingService {
 
     private String inviteText(Meeting meeting, String inviteeName) {
         String when = meeting.getScheduledAt() == null
-                ? "abhi (instant meeting)"
+                ? "now (instant meeting)"
                 : DateTimeFormatter.ofPattern("dd MMM yyyy, hh:mm a")
                     .withZone(ZoneId.systemDefault()).format(meeting.getScheduledAt());
         return "Hi" + (inviteeName == null ? "" : " " + inviteeName)

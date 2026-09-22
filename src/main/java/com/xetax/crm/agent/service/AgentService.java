@@ -42,7 +42,7 @@ public class AgentService {
     public Map<String, Object> create(String name, String persona, String welcomeMessage,
                                       String themeColor) {
         if (name == null || name.isBlank()) {
-            throw new BadRequestException("Agent ka naam zaroori hai");
+            throw new BadRequestException("An agent needs a name");
         }
         AiAgent agent = agentRepository.save(AiAgent.builder()
                 .ownerUserId(ownerId())
@@ -104,7 +104,7 @@ public class AgentService {
         } catch (BadRequestException e) {
             throw e;
         } catch (Exception e) {
-            throw new BadRequestException("PDF process nahi ho paya: " + e.getMessage());
+            throw new BadRequestException("The PDF could not be processed: " + e.getMessage());
         }
     }
 
@@ -122,7 +122,7 @@ public class AgentService {
     public AgentSource addText(Long agentId, String name, String text) {
         requireMine(agentId);
         if (text == null || text.isBlank()) {
-            throw new BadRequestException("Text khali hai");
+            throw new BadRequestException("The text is empty");
         }
         return saveAndIndex(agentId, "TEXT",
                 name == null || name.isBlank() ? "Manual text" : name.trim(), text);

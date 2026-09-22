@@ -62,7 +62,10 @@ public class JWTService {
                 .subject(user.getId().toString())
                 .issuer(issuer)
                 .issuedAt(Date.from(now))
-                .expiration(java.util.Date.from(now.plusSeconds(accessTtlSeconds)))
+                // Its own, longer life. Stamped with the access token's, it
+                // died at the same second, so the silent refresh always failed
+                // and everyone was signed out an hour after logging in.
+                .expiration(java.util.Date.from(now.plusSeconds(refreshTtlSeconds)))
                 .claims(Map.of("typ", "refresh"))
                 .signWith(secretKey, SignatureAlgorithm.HS256).compact();
     }

@@ -101,6 +101,6 @@ public class AgentTools {
 
     private static String safeMessage(Exception e) {
         String message = e.getMessage();
-        return message == null || message.isBlank() ? "Action fail ho gaya." : message;
+        return message == null || message.isBlank() ? "That action did not go through." : message;
     }
 }

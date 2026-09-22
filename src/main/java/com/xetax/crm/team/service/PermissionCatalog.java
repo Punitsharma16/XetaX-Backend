@@ -42,26 +42,26 @@ public final class PermissionCatalog {
         GROUPS.put("Email", List.of(
                 new Permission("email.campaigns", "Bulk email campaigns from the org's own SMTP")));
         GROUPS.put("Automations", List.of(
-                new Permission("automations.view", "Automations dekhna"),
-                new Permission("automations.manage", "Automations banana-badalna")));
+                new Permission("automations.view", "View automations"),
+                new Permission("automations.manage", "Create and edit automations")));
         GROUPS.put("Integrations", List.of(
-                new Permission("integrations.view", "Integrations dekhna"),
-                new Permission("integrations.manage", "Integrations banana-badalna")));
+                new Permission("integrations.view", "View integrations"),
+                new Permission("integrations.manage", "Create and edit integrations")));
         GROUPS.put("WhatsApp", List.of(
-                new Permission("whatsapp.view", "WhatsApp setup/usage dekhna"),
+                new Permission("whatsapp.view", "View WhatsApp setup and usage"),
                 new Permission("whatsapp.manage", "Connect/disconnect & templates"),
-                new Permission("whatsapp.inbox", "Inbox & messages bhejna"),
-                new Permission("whatsapp.campaigns", "Campaigns banana & chalana")));
+                new Permission("whatsapp.inbox", "Read the inbox and send messages"),
+                new Permission("whatsapp.campaigns", "Create and run campaigns")));
         GROUPS.put("Meetings", List.of(
-                new Permission("meetings.view", "Meetings dekhna & join"),
-                new Permission("meetings.manage", "Meetings banana, share, notes")));
+                new Permission("meetings.view", "View and join meetings"),
+                new Permission("meetings.manage", "Create meetings, share them and take notes")));
         GROUPS.put("AI Assistant", List.of(
-                new Permission("ai.use", "AI assistant use karna"),
-                new Permission("agents.manage", "Public AI agents banana & unka knowledge manage")));
+                new Permission("ai.use", "Use the AI assistant"),
+                new Permission("agents.manage", "Create public AI agents and manage their knowledge")));
         GROUPS.put("Live Chat Desk", List.of(
-                new Permission("desk.handle", "Handoff requests dekhna & customers se live chat")));
+                new Permission("desk.handle", "Take handoff requests and chat with customers live")));
         GROUPS.put("Team", List.of(
-                new Permission("team.manage", "Members & roles manage karna")));
+                new Permission("team.manage", "Manage members and roles")));
     }
 
     public static final Set<String> ALL_KEYS = GROUPS.values().stream()

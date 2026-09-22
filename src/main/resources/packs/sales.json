@@ -3,8 +3,8 @@
   "name": "Sales Pipeline",
   "icon": "bi-graph-up-arrow",
   "color": "#4f46e5",
-  "tagline": "Leads se deals tak — kuch bhi na chhoote",
-  "description": "Naye leads capture karo, follow-up karo, aur har deal ko Won tak track karo.",
+  "tagline": "From leads to deals, with nothing slipping through",
+  "description": "Capture new leads, follow them up and track every deal through to Won.",
   "fields": [
     {
       "label": "Name",
@@ -144,7 +144,7 @@
       "actionValue": null,
       "emailSubject": null,
       "emailMessage": "Hi {name}! Aapki enquiry mil gayi hai — hamari team jald contact karegi.",
-      "note": "Naya lead aate hi WhatsApp welcome"
+      "note": "A WhatsApp welcome as soon as a new lead arrives"
     },
     {
       "name": "Won - thank you",
@@ -156,31 +156,7 @@
       "actionValue": null,
       "emailSubject": null,
       "emailMessage": "Congratulations {name}! Aapka order confirm ho gaya. Dhanyavaad!",
-      "note": "Deal Won hote hi thank-you message"
-    },
-    {
-      "name": "Not reachable - follow-up",
-      "trigger": "STATUS_CHANGED",
-      "triggerStageCode": "CONTACTED",
-      "triggerStatusName": "Not reachable",
-      "actionType": "SEND_WHATSAPP",
-      "actionFieldKey": "phone",
-      "actionValue": null,
-      "emailSubject": null,
-      "emailMessage": "{name} ji, humne aapse sampark karne ki koshish ki. Jab free hon, reply kar dein — hum turant call karenge.",
-      "note": "Status 'Not reachable' hote hi customer ko soft nudge"
-    },
-    {
-      "name": "Negotiation nudge",
-      "trigger": "STATUS_CHANGED",
-      "triggerStageCode": "PROPOSAL",
-      "triggerStatusName": "Negotiating",
-      "actionType": "SEND_WHATSAPP",
-      "actionFieldKey": "phone",
-      "actionValue": null,
-      "emailSubject": null,
-      "emailMessage": "{name} ji, proposal par koi sawaal ho to batayein — best price ke liye hum taiyar hain!",
-      "note": "Status 'Negotiating' par deal aage badhane wala message"
+      "note": "A thank-you message as soon as the deal is Won"
     }
   ],
   "industry": "Sales / B2B",

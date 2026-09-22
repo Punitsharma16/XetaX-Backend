@@ -187,17 +187,17 @@ public class WhatsAppMessagingService {
         } else if (phone != null && !phone.isBlank()) {
             rawPhone = phone;
         } else {
-            throw new BadRequestException("Phone ya conversation chahiye");
+            throw new BadRequestException("A phone number or a conversation is required");
         }
         String target = phoneNumberService.normalize(rawPhone).orElseThrow(
-                () -> new BadRequestException("'" + rawPhone + "' valid WhatsApp number nahi hai"));
+                () -> new BadRequestException("'" + rawPhone + "' is not a valid WhatsApp number"));
 
         if (!isWindowOpen(config.getId(), target)) {
             throw new BadRequestException(
-                    "24-hour window band hai — media sirf active conversation me bheji ja sakti hai.");
+                    "The 24-hour window is closed — media can only be sent inside an active conversation.");
         }
         if (file == null || file.isEmpty()) {
-            throw new BadRequestException("File khali hai");
+            throw new BadRequestException("The file is empty");
         }
 
         String mime = file.getContentType() == null ? "application/octet-stream" : file.getContentType();
@@ -213,7 +213,7 @@ public class WhatsAppMessagingService {
         } catch (com.xetax.crm.whatsapp.client.WhatsAppProviderException e) {
             throw new BadRequestException("Media upload fail: " + e.getUserMessage());
         } catch (java.io.IOException e) {
-            throw new BadRequestException("File read nahi hui");
+            throw new BadRequestException("The file could not be read");
         }
 
         String body = (caption == null || caption.isBlank()

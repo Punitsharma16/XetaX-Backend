@@ -70,6 +70,32 @@ public class AuthUserServiceImpl implements AuthUserService, UserDetailsService 
     }
 
     @Override
+    @Transactional
+    public AuthUserDto createVerifiedUser(AuthUserDto userDto, String passwordHash) {
+        if (userDto.getEmail() == null || userDto.getEmail().isBlank()) {
+            throw new IllegalArgumentException("Email is required");
+        }
+        if (userRepository.existsByEmail(userDto.getEmail())) {
+            throw new IllegalArgumentException("This email is already registered");
+        }
+        if (userDto.getPhone() != null && userDto.getPhone().isBlank()) {
+            userDto.setPhone(null);
+        }
+        if (userDto.getPhone() != null && userRepository.existsByPhone(userDto.getPhone().trim())) {
+            throw new IllegalArgumentException("This phone number is already registered");
+        }
+        AuthUserEntity user = modelMapper.map(userDto, AuthUserEntity.class);
+        user.setId(null);
+        user.setParentId("#");
+        user.setProvider(LoginProvider.LOCAL);
+        user.setCreateAt(Instant.now());
+        user.setEmailVerified(true);
+        // Already hashed at sign-up — encoding it again would lock the person out.
+        user.setPassword(passwordHash);
+        return modelMapper.map(userRepository.save(user), AuthUserDto.class);
+    }
+
+    @Override
     public AuthUserDto getUserByEmail(String email) {
         AuthUserEntity user = userRepository.findByEmail(email)
                 .orElseThrow(() -> new ResourceNotFoundException("User Not Found with given email id"));

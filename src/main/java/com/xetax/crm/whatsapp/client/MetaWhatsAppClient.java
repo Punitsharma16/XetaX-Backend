@@ -391,7 +391,7 @@ public class MetaWhatsAppClient {
                     .path("id").asText(null);
             if (mediaId == null) {
                 throw new WhatsAppProviderException("NO_MEDIA_ID",
-                        "Meta ne media accept nahi kiya.", "media upload returned no id");
+                        "Meta did not accept the media.", "media upload returned no id");
             }
             return mediaId;
         } catch (RestClientResponseException e) {

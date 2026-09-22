@@ -20,6 +20,7 @@ import java.util.List;
 public class FormController {
 
     private final FormService formService;
+    private final com.xetax.crm.team.service.PermissionService permissionService;
 
     @PostMapping
     @RequiresPermission("forms.manage")
@@ -34,9 +35,14 @@ public class FormController {
         );
     }
 
+    /**
+     * Anyone who may read records may read the forms they belong to: the
+     * records picker lists forms, and a record page needs its form's fields to
+     * render at all. Without this a sales agent saw an empty Records page.
+     */
     @GetMapping
-    @RequiresPermission("forms.view")
     public ResponseEntity<ApiResponse<List<FormResponse>>> getAll(){
+        permissionService.requireAny("forms.view", "records.view", "records.view.own");
 
         return ResponseEntity.ok(
                 ResponseUtil.success(
@@ -47,9 +53,9 @@ public class FormController {
     }
 
     @GetMapping("/{id}")
-    @RequiresPermission("forms.view")
     public ResponseEntity<ApiResponse<FormResponse>> getById(
             @PathVariable Long id){
+        permissionService.requireAny("forms.view", "records.view", "records.view.own");
 
         return ResponseEntity.ok(
                 ResponseUtil.success(
