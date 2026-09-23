@@ -65,6 +65,27 @@ public interface WhatsAppMessageRepository extends JpaRepository<WhatsAppMessage
             + "AND m.direction = 'INBOUND' AND m.createdAt >= :from")
     List<Object[]> inboundForCharges(@Param("configId") Long configId, @Param("from") LocalDateTime from);
 
+    /**
+     * What Meta itself said it charged, for the messages created since
+     * {@code from}: category, whether it was billable, and how many.
+     *
+     * <p>Kept separate from the estimate on purpose. The estimate is our own
+     * arithmetic; this is Meta's answer, and the two drifting apart is exactly
+     * what nobody would otherwise notice — from 1 October 2026 a service
+     * message keeps arriving as category "service" while billable flips to
+     * true, so a bill can grow with no visible cause.
+     */
+    @Query("SELECT m.pricingCategory, m.pricingBillable, COUNT(m) "
+            + "FROM WhatsAppMessage m WHERE m.whatsappConfigId = :configId "
+            + "AND m.direction = 'OUTBOUND' AND m.createdAt >= :from "
+            + "AND m.pricingBillable IS NOT NULL "
+            + "GROUP BY m.pricingCategory, m.pricingBillable")
+    List<Object[]> metaPricingSince(@Param("configId") Long configId, @Param("from") LocalDateTime from);
+
+    /** Outbound messages created since {@code from}, whatever Meta has said about them. */
+    long countByWhatsappConfigIdAndDirectionAndCreatedAtGreaterThanEqual(
+            Long whatsappConfigId, com.xetax.crm.whatsapp.enums.MessageDirection direction, LocalDateTime from);
+
     /** Did this thread ever receive a campaign message? (bot scope = CAMPAIGN replies only) */
     boolean existsByConversationIdAndCampaignIdIsNotNull(Long conversationId);
     /** Public media link → the message that owns the file. */

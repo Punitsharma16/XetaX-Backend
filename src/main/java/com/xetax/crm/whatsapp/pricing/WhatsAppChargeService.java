@@ -3,6 +3,7 @@ package com.xetax.crm.whatsapp.pricing;
 import com.xetax.crm.common.exception.ResourceNotFoundException;
 import com.xetax.crm.whatsapp.entity.WhatsAppCampaign;
 import com.xetax.crm.whatsapp.entity.WhatsAppConfig;
+import com.xetax.crm.whatsapp.enums.MessageDirection;
 import com.xetax.crm.whatsapp.entity.WhatsAppTemplate;
 import com.xetax.crm.whatsapp.enums.RecipientStatus;
 import com.xetax.crm.whatsapp.repository.WhatsAppCampaignRecipientRepository;
@@ -118,6 +119,37 @@ public class WhatsAppChargeService {
         view.put("otherCountries", result.otherCountries());
         view.put("unknownCategory", result.unknownCategory());
         view.put("unpriced", result.unpriced());
+
+        // Meta's own answer, beside our arithmetic. Counted from the start of
+        // the month itself, not from the look-back the free-entry-point rule
+        // needs, so the two figures describe the same period.
+        LocalDateTime monthStart = month.atDay(1).atStartOfDay(zone)
+                .withZoneSameInstant(stored).toLocalDateTime();
+        long metaBillable = 0;
+        long metaFree = 0;
+        Map<String, Long> metaByCategory = new LinkedHashMap<>();
+        for (Object[] row : messageRepository.metaPricingSince(config.getId(), monthStart)) {
+            String category = row[0] == null ? "unknown" : String.valueOf(row[0]);
+            long count = ((Number) row[2]).longValue();
+            if (Boolean.TRUE.equals(row[1])) {
+                metaBillable += count;
+                metaByCategory.merge(category, count, Long::sum);
+            } else {
+                metaFree += count;
+            }
+        }
+        long outboundThisMonth = messageRepository
+                .countByWhatsappConfigIdAndDirectionAndCreatedAtGreaterThanEqual(
+                        config.getId(), MessageDirection.OUTBOUND, monthStart);
+
+        view.put("metaBillable", metaBillable);
+        view.put("metaFree", metaFree);
+        // How much of the month Meta has actually reported on — without this,
+        // "Meta says 3" next to "we charge 40" reads as a disaster when it only
+        // means the delivery receipts have not arrived yet.
+        view.put("metaKnown", metaBillable + metaFree);
+        view.put("metaOutbound", outboundThisMonth);
+        view.put("metaBillableByCategory", metaByCategory);
         return view;
     }
 
