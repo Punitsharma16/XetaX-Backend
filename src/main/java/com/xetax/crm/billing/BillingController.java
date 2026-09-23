@@ -11,6 +11,7 @@ import org.springframework.web.bind.annotation.*;
 
 import java.time.LocalDateTime;
 import java.util.ArrayList;
+import java.util.HashMap;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
@@ -95,10 +96,18 @@ public class BillingController {
         out.put("packs", packs);
 
         List<Map<String, Object>> history = new ArrayList<>();
-        for (AiTopup t : topupRepository.findTop20ByOwnerUserIdOrderByIdDesc(own)) {
-            if (!"PAID".equals(t.getStatus())) continue;
-            history.add(Map.of("packKey", t.getPackKey(), "messages", t.getMessages(),
-                    "amountPaise", t.getAmountPaise(), "paidAt", t.getPaidAt()));
+        for (AiTopup t : topupRepository
+                .findTop20ByOwnerUserIdAndStatusInOrderByIdDesc(own, List.of("PAID", "FAILED"))) {
+            Map<String, Object> row = new HashMap<>();
+            row.put("packKey", t.getPackKey());
+            row.put("messages", t.getMessages());
+            row.put("amountPaise", t.getAmountPaise());
+            row.put("status", t.getStatus());
+            // A payment that failed never got a paidAt; what the customer
+            // remembers is when they tried. Map.of() would also refuse the
+            // null outright.
+            row.put("at", t.getPaidAt() != null ? t.getPaidAt() : t.getCreatedAt());
+            history.add(row);
         }
         out.put("topupHistory", history);
         return ResponseUtil.success("Billing summary", out);

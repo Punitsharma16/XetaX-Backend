@@ -114,6 +114,19 @@ public class WhatsAppConfigController {
         }
     }
 
+    /**
+     * Edits a template Meta already has, instead of deleting and recreating
+     * it: the name, the language and the template's quality history survive.
+     * Meta re-reviews it, so it goes back to PENDING here.
+     */
+    @PutMapping("/templates/{id}")
+    @RequiresPermission("whatsapp.manage")
+    public ApiResponse<WhatsAppTemplateResponse> updateTemplate(
+            @PathVariable Long id, @RequestBody TemplateCreateRequest request) {
+        return ResponseUtil.success("Template sent back for approval",
+                templateService.updateTemplate(id, request));
+    }
+
     @DeleteMapping("/templates/{name}")
     @RequiresPermission("whatsapp.manage")
     public ApiResponse<Void> deleteTemplate(@PathVariable String name) {

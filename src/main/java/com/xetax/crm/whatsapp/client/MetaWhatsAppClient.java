@@ -340,6 +340,18 @@ public class MetaWhatsAppClient {
         return sendMessage(phoneNumberId, token, payload);
     }
 
+    /**
+     * Edits an existing template in place.
+     *
+     * <p>Meta addresses an edit by the template's own id, not by name, and
+     * replaces every component with the ones in this payload — there is no way
+     * to change one component on its own. Name and language cannot be changed
+     * at all, and the category only while the template is not approved.
+     */
+    public JsonNode updateTemplate(String metaTemplateId, String token, Map<String, Object> payload) {
+        return postJson(properties.apiUrl("/" + metaTemplateId), token, payload);
+    }
+
     /** Deletes a template (all languages of that name). */
     public void deleteTemplate(String wabaId, String token, String name) {
         try {

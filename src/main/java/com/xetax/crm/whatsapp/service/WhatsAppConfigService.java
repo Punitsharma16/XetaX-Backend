@@ -1,5 +1,6 @@
 package com.xetax.crm.whatsapp.service;
 
+import com.xetax.crm.common.ConfigValues;
 import com.xetax.crm.auth.security.CurrentUserProvider;
 import com.xetax.crm.common.exception.ResourceNotFoundException;
 import com.xetax.crm.common.exception.UnauthorizedException;
@@ -77,10 +78,11 @@ public class WhatsAppConfigService {
     /** Non-secret values the frontend needs to launch Embedded Signup. */
     public Map<String, Object> embeddedSignupMeta() {
         return Map.of(
-                "appId", properties.getAppId() == null ? "" : properties.getAppId(),
-                "configId", properties.getConfigId() == null ? "" : properties.getConfigId(),
+                "appId", ConfigValues.orEmpty(properties.getAppId()),
+                "configId", ConfigValues.orEmpty(properties.getConfigId()),
                 "graphApiVersion", properties.getGraphApiVersion(),
-                "configured", properties.getAppId() != null && !properties.getAppId().isBlank()
+                // Same field as before — only the placeholder now counts as unset.
+                "configured", ConfigValues.isSet(properties.getAppId())
         );
     }
 

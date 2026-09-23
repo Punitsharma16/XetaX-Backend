@@ -181,6 +181,90 @@ public class WhatsAppTemplateService {
         }
     }
 
+    /**
+     * Edits a template that already exists at Meta, keeping its name, its
+     * language and — crucially — its quality rating and history, which a
+     * delete-and-recreate throws away.
+     *
+     * <p>Meta's rules, which this enforces before spending a call:
+     * <ul>
+     *   <li>Only APPROVED, REJECTED or PAUSED templates can be edited; one
+     *       still under review cannot.</li>
+     *   <li>Name and language can never change, so they are taken from the
+     *       stored template and whatever the request says is ignored.</li>
+     *   <li>The category of an approved template cannot change either, so it
+     *       is only sent when the template is not approved.</li>
+     *   <li>Every component is replaced together — there is no editing one
+     *       part — so the request has to describe the whole template.</li>
+     * </ul>
+     *
+     * <p>Meta re-reviews an edited template, so the local row goes back to the
+     * status Meta returns (normally PENDING) and the next sync settles it.
+     */
+    @Transactional
+    public WhatsAppTemplateResponse updateTemplate(Long id, TemplateCreateRequest request) {
+        WhatsAppConfig config = configService.requireConnectedConfig();
+
+        WhatsAppTemplate template = templateRepository.findById(id)
+                .filter(t -> t.getWhatsappConfigId().equals(config.getId()))
+                .orElseThrow(() -> new BadRequestException("Template not found"));
+
+        if (template.getMetaTemplateId() == null || template.getMetaTemplateId().isBlank()) {
+            throw new BadRequestException(
+                    "This template has no Meta id yet — press Sync, then edit it.");
+        }
+
+        String status = template.getStatus() == null ? "" : template.getStatus().toUpperCase();
+        if (!List.of("APPROVED", "REJECTED", "PAUSED").contains(status)) {
+            throw new BadRequestException(
+                    "Only an approved, rejected or paused template can be edited. "
+                    + "This one is " + (status.isBlank() ? "still being reviewed" : status.toLowerCase())
+                    + " — wait for Meta's review to finish.");
+        }
+
+        // Name and language are the template's own; Meta will not change them.
+        String category = template.getCategory() == null ? "" : template.getCategory().toUpperCase();
+        boolean authentication = "AUTHENTICATION".equals(category);
+
+        java.util.Map<String, Object> payload = new java.util.LinkedHashMap<>();
+        payload.put("components", authentication
+                ? authenticationComponents()
+                : contentComponents(request));
+
+        // Meta refuses a category change on an approved template, so it only
+        // travels for one that is rejected or paused.
+        String requested = request.getCategory() == null ? "" : request.getCategory().trim().toUpperCase();
+        if (!"APPROVED".equals(status)
+                && List.of("MARKETING", "UTILITY", "AUTHENTICATION").contains(requested)) {
+            payload.put("category", requested);
+        }
+
+        String token = encryption.decrypt(config.getAccessTokenEncrypted());
+        try {
+            client.updateTemplate(template.getMetaTemplateId(), token, payload);
+        } catch (WhatsAppProviderException e) {
+            throw new BadRequestException("Meta rejected the edit: " + e.getUserMessage());
+        }
+
+        if (payload.containsKey("category")) {
+            template.setCategory((String) payload.get("category"));
+        }
+        template.setHeaderFormat(request.getHeaderFormat() == null || request.getHeaderFormat().isBlank()
+                ? (request.getHeaderText() == null || request.getHeaderText().isBlank() ? "NONE" : "TEXT")
+                : request.getHeaderFormat().trim().toUpperCase());
+        template.setHeaderMediaUrl(request.getHeaderMediaUrl());
+        try {
+            template.setComponentsJson(objectMapper.writeValueAsString(payload.get("components")));
+        } catch (Exception ignored) { }
+        // Edited templates go back through review; the next sync brings the
+        // verdict. Saying PENDING here is honest about that.
+        template.setStatus("PENDING");
+        template.setRejectionReason(null);
+        template.setSyncedAt(Instant.now());
+
+        return toResponse(templateRepository.save(template));
+    }
+
     /** Removes the template from Meta (all languages) and locally. */
     @Transactional
     public void deleteTemplate(String name) {

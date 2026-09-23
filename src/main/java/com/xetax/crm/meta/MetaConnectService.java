@@ -3,6 +3,7 @@ package com.xetax.crm.meta;
 import com.fasterxml.jackson.core.type.TypeReference;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.xetax.crm.auth.security.CurrentUserProvider;
+import com.xetax.crm.common.ConfigValues;
 import com.xetax.crm.common.exception.BadRequestException;
 import com.xetax.crm.common.exception.ResourceNotFoundException;
 import com.xetax.crm.data_manager.entity.FormEntity;
@@ -54,10 +55,11 @@ public class MetaConnectService {
     /** Non-secret values the Connect button needs. */
     public Map<String, Object> signupMeta() {
         return Map.of(
-                "appId", appProperties.getAppId() == null ? "" : appProperties.getAppId(),
-                "configId", adsProperties.getConfigId() == null ? "" : adsProperties.getConfigId(),
+                "appId", ConfigValues.orEmpty(appProperties.getAppId()),
+                "configId", ConfigValues.orEmpty(adsProperties.getConfigId()),
                 "graphApiVersion", appProperties.getGraphApiVersion(),
-                "configured", !appProperties.getAppId().isBlank() && !adsProperties.getConfigId().isBlank());
+                "configured", ConfigValues.isSet(appProperties.getAppId())
+                        && ConfigValues.isSet(adsProperties.getConfigId()));
     }
 
     public List<Map<String, Object>> list() {
