@@ -81,6 +81,7 @@ public class FormFieldTools {
         if (label == null || label.isBlank()) {
             return Map.of("created", false, "reason", "A field label is required.");
         }
+
         FieldType type;
         try {
             type = FieldType.valueOf(fieldType == null ? "" : fieldType.trim().toUpperCase());
