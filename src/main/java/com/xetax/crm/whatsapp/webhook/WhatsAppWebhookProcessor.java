@@ -114,6 +114,41 @@ public class WhatsAppWebhookProcessor {
         }
     }
 
+    /**
+     * Records what Meta says it charged for this message, straight from the
+     * webhook's pricing object.
+     *
+     * <p>Taken from Meta rather than worked out here, because from 1 October
+     * 2026 the category stops being enough on its own: a service message still
+     * arrives as category "service" while billable flips from false to true
+     * and the type from "free_customer_service" to "regular". Code that reads
+     * the category alone goes on calling those messages free.
+     *
+     * @return whether anything was actually recorded
+     */
+    private boolean applyPricing(JsonNode pricing, WhatsAppMessage message) {
+        if (pricing == null || pricing.isMissingNode() || pricing.isNull()) return false;
+
+        boolean changed = false;
+        if (pricing.hasNonNull("billable")) {
+            message.setPricingBillable(pricing.path("billable").asBoolean());
+            changed = true;
+        }
+        if (pricing.hasNonNull("category")) {
+            message.setPricingCategory(pricing.path("category").asText());
+            changed = true;
+        }
+        if (pricing.hasNonNull("type")) {
+            message.setPricingType(pricing.path("type").asText());
+            changed = true;
+        }
+        if (pricing.hasNonNull("pricing_model")) {
+            message.setPricingModel(pricing.path("pricing_model").asText());
+            changed = true;
+        }
+        return changed;
+    }
+
     /* ------------------------------------------------------- status (DLR) */
 
     private void applyStatus(JsonNode status) {
@@ -131,8 +166,15 @@ public class WhatsAppWebhookProcessor {
         if (newStatus == null) return;
 
         messageRepository.findByProviderMessageId(wamid).ifPresent(message -> {
+            // Pricing first, and outside the staleness check: Meta attaches it
+            // to whichever status it likes (often "sent"), so a DLR that moves
+            // the status nowhere can still be the one carrying what we were
+            // charged. Dropping it as "stale" would lose the figure for good.
+            boolean pricingChanged = applyPricing(status.path("pricing"), message);
+
             if (RANK.get(newStatus) <= RANK.get(message.getStatus())) {
-                return; // stale or duplicate DLR — ignore
+                if (pricingChanged) messageRepository.save(message);
+                return; // stale or duplicate DLR — nothing else to do
             }
             boolean wasDelivered = RANK.get(message.getStatus())
                     >= RANK.get(WhatsAppMessageStatus.DELIVERED);

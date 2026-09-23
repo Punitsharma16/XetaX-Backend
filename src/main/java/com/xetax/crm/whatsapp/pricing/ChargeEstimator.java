@@ -37,6 +37,17 @@ public final class ChargeEstimator {
     static final Duration FREE_ENTRY_REPLY_WITHIN = Duration.ofHours(24);
     static final Duration FREE_ENTRY_WINDOW = Duration.ofHours(72);
 
+    /**
+     * The day Meta starts charging for service messages. Before it every
+     * service message is free, however many there are; from it the monthly
+     * allowance applies and the rest are charged at the utility rate.
+     *
+     * <p>Judged on the day the message was <em>delivered</em>, in the billing
+     * zone, so the cutover needs no deployment on the day and a month that
+     * straddles it is split correctly.
+     */
+    public static final LocalDate SERVICE_BILLING_STARTS = LocalDate.of(2026, 10, 1);
+
     /** Shown in this order, always — a month with no marketing still shows ₹0 for it. */
     public static final List<ChargeCategory> LINES = List.of(
             ChargeCategory.MARKETING, ChargeCategory.UTILITY,
@@ -93,6 +104,8 @@ public final class ChargeEstimator {
             amounts.put(line, BigDecimal.ZERO);
         }
         long freeEntryPoint = 0, awaiting = 0, otherCountries = 0, unknownCategory = 0, unpriced = 0;
+        /** Service messages that cost nothing — by date, or by the allowance. */
+        long freeService = 0;
         List<Charge> service = new ArrayList<>();
 
         for (Outbound out : outbound) {
@@ -126,6 +139,14 @@ public final class ChargeEstimator {
             }
 
             LocalDate day = out.chargeTime().atZone(zone).toLocalDate();
+
+            // Before the cutover Meta charged nothing for a service message,
+            // so counting one would overstate the bill for that month.
+            if (line == ChargeCategory.SERVICE && day.isBefore(SERVICE_BILLING_STARTS)) {
+                freeService++;
+                continue;
+            }
+
             BigDecimal rate = rates.rate(line.pricedAs(), day);
             if (rate == null) {
                 unpriced++;
@@ -142,6 +163,7 @@ public final class ChargeEstimator {
         // A monthly allowance, if Meta gives one, covers the earliest service messages.
         service.sort(Comparator.comparing(Charge::time));
         int freeAllowance = Math.min(Math.max(freeServicePerMonth, 0), service.size());
+        freeService += freeAllowance;
         for (int i = freeAllowance; i < service.size(); i++) {
             counts.merge(ChargeCategory.SERVICE, 1L, Long::sum);
             amounts.merge(ChargeCategory.SERVICE, service.get(i).rate(), BigDecimal::add);
@@ -156,7 +178,7 @@ public final class ChargeEstimator {
             charged += counts.get(category);
             lines.add(new Line(category, counts.get(category), money(amount)));
         }
-        return new Result(money(total), lines, charged, freeEntryPoint, freeAllowance,
+        return new Result(money(total), lines, charged, freeEntryPoint, freeService,
                 awaiting, otherCountries, unknownCategory, unpriced);
     }
 

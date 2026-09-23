@@ -266,6 +266,56 @@ class ChargeEstimatorTest {
 
     /* -------------------------------------------------------- allowance */
 
+    /* ------------------------------ the 1 October 2026 cutover */
+
+    @Test
+    void serviceMessagesCostNothingBeforeTheFirstOfOctober() {
+        // September: Meta charged nothing for a reply, however many were sent.
+        Result r = ChargeEstimator.estimate(
+                List.of(reply("TEXT", "2026-09-30T23:59:00"), reply("TEXT", "2026-09-15T10:00:00")),
+                List.of(), o -> null, card(), IST, YearMonth.of(2026, 9), 1000);
+
+        assertEquals(0, r.total().compareTo(BigDecimal.ZERO), "September replies are free");
+        assertEquals(2, r.freeAllowance(), "and they are reported as free, not hidden");
+        assertEquals(0, line(r, ChargeCategory.SERVICE).messages());
+    }
+
+    @Test
+    void theFirstOfOctoberIsTheDayChargingStarts() {
+        // One minute past midnight IST on the 1st is already chargeable.
+        Result r = ChargeEstimator.estimate(
+                List.of(reply("TEXT", "2026-10-01T00:01:00")),
+                List.of(), o -> null, card(), IST, OCT, 0);
+
+        assertEquals(1, line(r, ChargeCategory.SERVICE).messages());
+    }
+
+    @Test
+    void theAllowanceOnlyAppliesOnceChargingHasStarted() {
+        // 1,000 free a month from October; before that everything was free
+        // anyway, so the allowance never had to do any work.
+        Result r = run(List.of(reply("TEXT", "2026-10-02T10:00:00"),
+                               reply("TEXT", "2026-10-02T11:00:00"),
+                               reply("TEXT", "2026-10-02T12:00:00")),
+                       List.of(), card(), 2);
+
+        assertEquals(1, line(r, ChargeCategory.SERVICE).messages(), "only the third is charged");
+        assertEquals(2, r.freeAllowance());
+    }
+
+    @Test
+    void aTemplateIsChargedInSeptemberJustAsBefore() {
+        // The cutover is about service messages only — templates were always
+        // charged and must not become free by accident.
+        Result r = ChargeEstimator.estimate(
+                List.of(template("promo", "2026-09-15T10:00:00")),
+                List.of(), o -> CATEGORIES.get(o.templateName()), card(), IST,
+                YearMonth.of(2026, 9), 1000);
+
+        assertEquals(1, line(r, ChargeCategory.MARKETING).messages());
+        assertTrue(r.total().compareTo(BigDecimal.ZERO) > 0);
+    }
+
     @Test
     void anAllowanceCoversTheEarliestRepliesOnly() {
         List<Outbound> out = List.of(

@@ -237,7 +237,14 @@ app:
   # WhatsApp charge estimate: Meta's month starts at midnight in the WABA's zone.
   whatsapp-billing-zone: ${WHATSAPP_BILLING_ZONE:Asia/Kolkata}
   # Service messages Meta does not charge each month. 0 until Meta confirms one.
-  whatsapp-free-service-per-month: ${WHATSAPP_FREE_SERVICE_PER_MONTH:0}
+  # Meta's allowance from 1 October 2026: 1,000 delivered service messages
+  # per business phone number per month.
+  whatsapp-free-service-per-month: ${WHATSAPP_FREE_SERVICE_PER_MONTH:1000}
+
+  # How long the WhatsApp bot waits for the customer to finish typing before it
+  # answers. A burst of lines then costs one reply instead of one per line.
+  # 0 answers immediately, as it did before; anything above 30 is capped.
+  bot-burst-window-seconds: ${BOT_BURST_WINDOW_SECONDS:3}
   # Largest inbound WhatsApp file to pull from Meta and keep (25 MB). Anything
   # bigger stays on Meta: the message still shows, just without a link.
   whatsapp-media-max-bytes: ${WHATSAPP_MEDIA_MAX_BYTES:26214400}

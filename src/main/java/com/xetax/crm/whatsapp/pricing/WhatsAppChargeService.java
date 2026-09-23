@@ -42,8 +42,14 @@ public class WhatsAppChargeService {
     @Value("${app.whatsapp-billing-zone:Asia/Kolkata}")
     private String billingZone;
 
-    /** Service messages Meta leaves uncharged each month; 0 until Meta confirms an allowance. */
-    @Value("${app.whatsapp-free-service-per-month:0}")
+    /**
+     * Service messages Meta leaves uncharged each month, per business phone
+     * number. Meta's figure from 1 October 2026 is 1,000; before that date the
+     * estimator charges for none at all, so this only takes effect after the
+     * cutover. One WhatsApp number per workspace here, so the workspace total
+     * is the number's total.
+     */
+    @Value("${app.whatsapp-free-service-per-month:1000}")
     private int freeServicePerMonth;
 
     public ZoneId zone() {
@@ -101,6 +107,13 @@ public class WhatsAppChargeService {
         view.put("chargedMessages", result.chargedMessages());
         view.put("freeEntryPoint", result.freeEntryPoint());
         view.put("freeAllowance", result.freeAllowance());
+        // The panel has to word the free replies differently on each side of
+        // the cutover: before it nothing is charged at all, after it only the
+        // first thousand are free.
+        view.put("freeAllowanceLimit", freeServicePerMonth);
+        view.put("serviceChargingFrom", ChargeEstimator.SERVICE_BILLING_STARTS.toString());
+        view.put("serviceCharging",
+                !month.atEndOfMonth().isBefore(ChargeEstimator.SERVICE_BILLING_STARTS));
         view.put("awaitingDelivery", result.awaitingDelivery());
         view.put("otherCountries", result.otherCountries());
         view.put("unknownCategory", result.unknownCategory());

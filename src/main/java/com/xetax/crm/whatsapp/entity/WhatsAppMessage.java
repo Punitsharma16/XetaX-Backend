@@ -107,6 +107,32 @@ public class WhatsAppMessage extends BaseEntity {
     @Column(nullable = false, length = 12)
     private WhatsAppMessageStatus status;
 
+    /* ------ what Meta says it charged, taken from the delivery webhook */
+
+    /**
+     * Whether Meta charged for this message, as its own webhook reported it.
+     * Null until a status webhook carrying a pricing object has arrived.
+     *
+     * <p>This — not the category — is the figure to trust. From 1 October 2026
+     * a service message still arrives as category "service", but billable
+     * flips from false to true, so anything reading the category alone
+     * silently under-reports from that day.
+     */
+    @Column(name = "pricing_billable")
+    private Boolean pricingBillable;
+
+    /** Meta's own category: marketing, utility, authentication or service. */
+    @Column(name = "pricing_category", length = 24)
+    private String pricingCategory;
+
+    /** "regular" once a message is charged, "free_customer_service" while it is not. */
+    @Column(name = "pricing_type", length = 32)
+    private String pricingType;
+
+    /** Meta's pricing model, e.g. PMP for per-message pricing. */
+    @Column(name = "pricing_model", length = 16)
+    private String pricingModel;
+
     @Column(length = 32)
     private String errorCode;
 

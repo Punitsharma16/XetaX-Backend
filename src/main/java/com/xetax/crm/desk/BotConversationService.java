@@ -42,6 +42,10 @@ import com.xetax.crm.whatsapp.webhook.WhatsAppInboundEvent;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.ai.chat.client.ChatClient;
 import org.springframework.ai.document.Document;
+import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.beans.factory.annotation.Value;
+import org.springframework.beans.factory.annotation.Qualifier;
+import org.springframework.context.annotation.Lazy;
 import org.springframework.context.event.EventListener;
 import org.springframework.data.mongodb.core.MongoTemplate;
 import org.springframework.data.mongodb.core.query.Criteria;
@@ -52,10 +56,15 @@ import org.springframework.transaction.annotation.Transactional;
 import tools.jackson.databind.JsonNode;
 import tools.jackson.databind.ObjectMapper;
 
+import java.time.Duration;
 import java.time.LocalDateTime;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 import java.time.format.DateTimeFormatter;
+import java.util.concurrent.Executor;
+import java.util.concurrent.Executors;
+import java.util.concurrent.ScheduledExecutorService;
+import java.util.concurrent.TimeUnit;
 import java.util.*;
 
 /**
@@ -111,6 +120,47 @@ public class BotConversationService {
     private final AppointmentService appointmentService;
     private final ChatClient chatClient;
     private final ObjectMapper mapper = new ObjectMapper();
+
+    /* --------------------------------------- answering a burst only once */
+
+    /**
+     * How long a reply waits for the customer to finish typing.
+     *
+     * <p>People write the way they speak: "hi", then "I need a quote", then
+     * "by tomorrow" — three messages in a few seconds. Answering each one sent
+     * three replies, which reads badly and, from 1 October 2026, costs three
+     * billable service messages instead of one.
+     */
+    @Value("${app.bot-burst-window-seconds:4}")
+    private int burstWindowSeconds;
+
+    /** Never below zero, and capped so a typo cannot leave customers waiting. */
+    private Duration burstWindow() {
+        return Duration.ofSeconds(Math.max(0, Math.min(burstWindowSeconds, 30)));
+    }
+
+    /**
+     * The wait runs here, not on botExecutor: that pool is two threads wide,
+     * so parking one of them for four seconds per message would queue the
+     * whole desk behind a single chatty customer.
+     */
+    private final ScheduledExecutorService replyTimer =
+            Executors.newSingleThreadScheduledExecutor(r -> {
+                Thread t = new Thread(r, "bot-burst");
+                t.setDaemon(true);
+                return t;
+            });
+
+    /** Decides which turn of a burst is the one that answers. */
+    @Autowired
+    private BurstGate burstGate;
+
+    /** Self, through the proxy, so the deferred turn still gets its transaction. */
+    @Autowired @Lazy
+    private BotConversationService self;
+
+    @Autowired @Qualifier("botExecutor")
+    private Executor botExecutor;
 
     public BotConversationService(ChatSessionRepository sessions, ChatSessionMessageRepository messages,
                                   HandoffRequestRepository handoffs, ChannelConfigService configService,
@@ -261,7 +311,62 @@ public class BotConversationService {
             sendWhatsApp(session, HANDOFF_TEXT, "AI");
             return;
         }
-        if (!quotaService.tryConsumeAgent(owner, agent.getId(), agent.getName())) {
+        // The message is stored; the answer waits to see whether more of it is
+        // coming. A request for a human, above, is never made to wait.
+        scheduleReply(session, agent, text);
+    }
+
+    /**
+     * Holds the answer back for {@code app.bot-burst-window-seconds}, and lets only the last
+     * line standing reply.
+     *
+     * <p>Every new message pushes the answer back and stands the previous turn
+     * down, so a burst produces one reply, one AI message off the quota and —
+     * from 1 October 2026 — one billable service message. The model still sees
+     * every line, because the earlier ones are already stored and the prompt
+     * carries the conversation history.
+     */
+    private void scheduleReply(ChatSession session, AiAgent agent, String text) {
+        Long sessionId = session.getId();
+        long token = burstGate.begin(sessionId);
+        Long agentId = agent.getId();
+
+        replyTimer.schedule(() -> {
+            try {
+                botExecutor.execute(() -> {
+                    try {
+                        self.answerAfterBurst(sessionId, token, agentId, text);
+                    } catch (Exception e) {
+                        log.warn("Deferred bot reply failed for session {}: {}", sessionId, e.getMessage());
+                    }
+                });
+            } catch (Exception e) {
+                log.warn("Could not hand off the deferred reply for session {}: {}", sessionId, e.getMessage());
+            }
+        }, burstWindow().toMillis(), TimeUnit.MILLISECONDS);
+    }
+
+    /**
+     * The second half of a WhatsApp turn, once the customer has stopped typing.
+     * Public and transactional because it is reached through the proxy from a
+     * pool thread, long after the inbound transaction has gone.
+     */
+    @Transactional
+    public void answerAfterBurst(Long sessionId, long token, Long agentId, String text) {
+        // Whoever is still the newest turn answers; the rest stand down.
+        if (!burstGate.shouldAnswer(sessionId, token)) return;
+
+        ChatSession session = sessions.findById(sessionId).orElse(null);
+        if (session == null) return;
+        AiAgent agent = agentRepository.findById(agentId)
+                .filter(a -> "ACTIVE".equals(a.getStatus())).orElse(null);
+        if (agent == null) return;
+        AgentChannelConfig cfg = configService.whatsappAgentConfig(session.getOwnerUserId()).orElse(null);
+        if (cfg == null) return;
+        // A person may have picked the chat up during the pause.
+        if (isHumanDriving(session)) return;
+
+        if (!quotaService.tryConsumeAgent(session.getOwnerUserId(), agent.getId(), agent.getName())) {
             // No AI left this month: don't go silent on a paying customer — get a human.
             requestHandoff(session, cfg, "AI quota exhausted");
             return;
