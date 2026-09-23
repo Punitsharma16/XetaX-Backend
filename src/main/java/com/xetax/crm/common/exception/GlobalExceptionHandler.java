@@ -66,6 +66,25 @@ public class GlobalExceptionHandler {
                 .message("Unsupported request content type").build());
     }
 
+    /**
+     * A URL nobody serves is the caller's mistake, not a server fault.
+     *
+     * <p>NoResourceFoundException extends ServletException rather than
+     * ResponseStatusException, so it fell through to the catch-all below and
+     * every typo'd path — and every scanner probing the host — came back 500
+     * with Spring's internal wording ("No static resource api/... for request
+     * ..."). Uptime monitors read that as the API being down.
+     */
+    @ExceptionHandler({
+            org.springframework.web.servlet.resource.NoResourceFoundException.class,
+            org.springframework.web.servlet.NoHandlerFoundException.class
+    })
+    public ResponseEntity<ErrorResponse> handleNoRoute(Exception ex) {
+        return ResponseEntity.status(HttpStatus.NOT_FOUND).body(ErrorResponse.builder()
+                .success(false).status(HttpStatus.NOT_FOUND.value()).error("NOT_FOUND")
+                .message("No such endpoint").build());
+    }
+
     @ExceptionHandler(org.springframework.web.HttpRequestMethodNotSupportedException.class)
     public ResponseEntity<ErrorResponse> handleMethodNotAllowed(org.springframework.web.HttpRequestMethodNotSupportedException ex) {
         return ResponseEntity.status(HttpStatus.METHOD_NOT_ALLOWED).body(ErrorResponse.builder()
