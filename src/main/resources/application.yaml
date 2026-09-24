@@ -303,6 +303,12 @@ voice:
     # burns the free character budget.
     max-chars: ${VOICE_TTS_MAX_CHARS:600}
 
+  # The assistant speaks Hindi and English (and the Hinglish mix of the two).
+  # This is the one it falls back to when what was said is too short to judge —
+  # "hello" and "haan" carry almost no signal, and Whisper reads them as
+  # anything at all. Only hi or en.
+  default-language: ${VOICE_DEFAULT_LANGUAGE:hi}
+
   # How long a socket may sit idle before it is closed (seconds).
   session-idle-seconds: ${VOICE_SESSION_IDLE_SECONDS:900}
 

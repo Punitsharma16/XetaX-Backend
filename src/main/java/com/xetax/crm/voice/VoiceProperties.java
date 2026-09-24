@@ -14,6 +14,8 @@ public class VoiceProperties {
 
     private boolean enabled = true;
     private int sessionIdleSeconds = 900;
+    /** Language to answer in when what was said is too short to tell. */
+    private String defaultLanguage = "hi";
     private final Stt stt = new Stt();
     private final Tts tts = new Tts();
 
@@ -22,6 +24,9 @@ public class VoiceProperties {
 
     public int getSessionIdleSeconds() { return sessionIdleSeconds; }
     public void setSessionIdleSeconds(int sessionIdleSeconds) { this.sessionIdleSeconds = sessionIdleSeconds; }
+
+    public String getDefaultLanguage() { return defaultLanguage; }
+    public void setDefaultLanguage(String defaultLanguage) { this.defaultLanguage = defaultLanguage; }
 
     public Stt getStt() { return stt; }
     public Tts getTts() { return tts; }

@@ -12,6 +12,7 @@ import com.xetax.crm.voice.assistant.VoiceAssistant;
 import com.xetax.crm.voice.assistant.VoiceReply;
 import com.xetax.crm.voice.config.VoiceHandshakeInterceptor;
 import com.xetax.crm.voice.stt.SpeechToText;
+import com.xetax.crm.voice.stt.SpokenLanguage;
 import com.xetax.crm.voice.stt.Transcript;
 import com.xetax.crm.voice.tts.Speech;
 import com.xetax.crm.voice.tts.TextToSpeech;
@@ -246,6 +247,8 @@ public class VoiceSocketHandler extends AbstractWebSocketHandler {
         SecurityContextHolder.getContext().setAuthentication(
                 new UsernamePasswordAuthenticationToken(user, null, java.util.List.of()));
 
+        // Answering a command ends the wake; being greeted does not.
+        boolean stayAwake = false;
         try {
             // Same meters as the typed assistant — voice is not a way around them.
             rateLimiter.check("voice:" + voice.userId(), 20, Duration.ofMinutes(1));
@@ -253,16 +256,47 @@ public class VoiceSocketHandler extends AbstractWebSocketHandler {
             String spoken;
             String language;
             if (typed != null) {
+                // Typing is an explicit act; it needs no wake phrase.
                 spoken = typed;
-                language = "en";
+                language = voice.language() == null ? props.getDefaultLanguage() : voice.language();
+                voice.wake();
             } else {
                 Transcript heard = speechToText.transcribe(audio, "speech." + voice.format());
                 if (heard.isBlank()) {
-                    send(session, mapper.createObjectNode().put("type", "idle"));
+                    sleepAndIdle(session, voice);
                     return;
                 }
                 spoken = heard.text();
-                language = heard.language();
+                language = SpokenLanguage.settle(heard.language(), spoken,
+                        voice.language(), props.getDefaultLanguage());
+
+                /*
+                 * Asleep, the only thing worth hearing is our own name. Anything
+                 * else was said to somebody in the room, and answering it would
+                 * mean running tools and spending credits on a conversation the
+                 * assistant was never part of.
+                 */
+                if (!voice.isAwake()) {
+                    WakeWord.Heard wake = WakeWord.find(spoken);
+                    if (wake == null) {
+                        send(session, mapper.createObjectNode().put("type", "ignored"));
+                        return;
+                    }
+                    voice.wake();
+                    voice.rememberLanguage(language);
+                    if (!wake.hasCommand()) {
+                        // Called by name and nothing more — open the microphone
+                        // and say so, rather than silently waiting. This turn
+                        // must NOT end the woken state: the command is coming.
+                        send(session, mapper.createObjectNode().put("type", "awake"));
+                        answerWithoutThinking(session, voice, greeting(language), language);
+                        stayAwake = true;
+                        return;
+                    }
+                    // "Hey XetaX, aaj ke task dikhao" — the command came with it.
+                    spoken = wake.command();
+                    send(session, mapper.createObjectNode().put("type", "awake"));
+                }
 
                 ObjectNode t = mapper.createObjectNode();
                 t.put("type", "transcript");
@@ -271,6 +305,7 @@ public class VoiceSocketHandler extends AbstractWebSocketHandler {
                 send(session, t);
             }
 
+            voice.rememberLanguage(language);
             if (voice.isCancelled()) return;
             send(session, mapper.createObjectNode().put("type", "thinking"));
 
@@ -282,18 +317,50 @@ public class VoiceSocketHandler extends AbstractWebSocketHandler {
 
             // Audio last: the screen has already moved and the text is already
             // on it, so a slow or failed voice costs nothing but the voice.
-            Speech speech = textToSpeech.speak(reply.text(), reply.language());
-            if (!speech.isEmpty() && !voice.isCancelled()) {
-                ObjectNode header = mapper.createObjectNode();
-                header.put("type", "audio");
-                header.put("format", speech.format());
-                header.put("bytes", speech.audio().length);
-                send(session, header);
-                sendBinary(session, speech.audio());
-            }
+            speak(session, voice, reply.text(), reply.language());
         } finally {
+            // One wake, one command. The next thing said needs the phrase again.
+            if (!stayAwake) voice.sleep();
             SecurityContextHolder.clearContext();
         }
+    }
+
+    /** Sends a spoken line with no round trip to the model behind it. */
+    private void answerWithoutThinking(WebSocketSession session, VoiceSession voice,
+                                       String text, String language) {
+        ObjectNode reply = mapper.createObjectNode();
+        reply.put("type", "reply");
+        reply.put("text", text);
+        reply.put("language", language);
+        reply.putNull("uiAction");
+        // Tells the phone to keep the microphone open: this was an invitation
+        // to speak, not an answer to something.
+        reply.put("greeting", true);
+        send(session, reply);
+        speak(session, voice, text, language);
+    }
+
+    private void speak(WebSocketSession session, VoiceSession voice, String text, String language) {
+        Speech speech = textToSpeech.speak(text, language);
+        if (speech.isEmpty() || voice.isCancelled()) return;
+        ObjectNode header = mapper.createObjectNode();
+        header.put("type", "audio");
+        header.put("format", speech.format());
+        header.put("bytes", speech.audio().length);
+        send(session, header);
+        sendBinary(session, speech.audio());
+    }
+
+    /** What the assistant says when it is called by name and nothing more. */
+    private static String greeting(String language) {
+        return SpokenLanguage.ENGLISH.equals(SpokenLanguage.normalise(language))
+                ? "Yes, go ahead." : "जी, बोलिए।";
+    }
+
+    /** Nothing was heard — drop back to waiting for the wake phrase. */
+    private void sleepAndIdle(WebSocketSession session, VoiceSession voice) {
+        voice.sleep();
+        send(session, mapper.createObjectNode().put("type", "idle"));
     }
 
     private ObjectNode replyFrame(VoiceReply reply) {

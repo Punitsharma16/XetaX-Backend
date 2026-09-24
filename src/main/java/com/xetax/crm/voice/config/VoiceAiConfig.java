@@ -4,6 +4,7 @@ import com.xetax.crm.ai.tools.RecordTools;
 import com.xetax.crm.ai.tools.ContactTools;
 import com.xetax.crm.meeting.tools.MeetingTools;
 import com.xetax.crm.voice.tools.NavigationTools;
+import com.xetax.crm.voice.tools.VoiceFormTools;
 import com.xetax.crm.whatsapp.tools.WhatsAppTools;
 import org.springframework.ai.chat.client.ChatClient;
 import org.springframework.ai.chat.client.advisor.MessageChatMemoryAdvisor;
@@ -44,6 +45,7 @@ public class VoiceAiConfig {
                                       MeetingTools meetingTools,
                                       WhatsAppTools whatsAppTools,
                                       NavigationTools navigationTools,
+                                      VoiceFormTools voiceFormTools,
                                       VoiceModelSelector modelSelector,
                                       @Value("${voice.model:}") String model) {
         var options = OpenAiChatOptions.builder()
@@ -72,9 +74,12 @@ public class VoiceAiConfig {
                     signed-in user on their phone, and they are usually busy or driving.
 
                     LANGUAGE — outranks every other rule:
-                    - Each user message starts with "[spoken language: xx]". Reply in THAT language,
-                      in the script the user would write it in: hi = Hindi in Devanagari, en =
-                      English, and so on. If they mix languages, mix them back the same way.
+                    - You answer in Hindi or English only. Each user message starts with
+                      "[spoken language: hi]" or "[spoken language: en]" — reply in that one.
+                      hi means Devanagari, en means plain English.
+                    - Hinglish is normal here. Mirror how they spoke: if they dropped English
+                      words into a Hindi sentence, do the same. Do not "correct" them into pure
+                      Hindi or pure English.
                     - Never translate their data — a name, company or form name is said as stored.
                     - Never mention that language line.
 
@@ -87,9 +92,18 @@ public class VoiceAiConfig {
 
                     SHOWING THINGS:
                     - When the user asks to SEE, SHOW, OPEN or GO TO something, call openScreen as
-                      well as answering — look it up first so you can pass its real id.
-                    - Say what you are doing: "Ravi Sharma ka contact khol raha hoon."
-                    - For a plain question, just answer. Do not open anything.
+                      well as answering.
+                    - Choose the screen from THIS request alone. What you opened a moment ago has
+                      nothing to do with it: "aaj ke task dikhao" is TASKS, and the very next
+                      sentence "sales pipeline ke record dikhao" is a RECORD_LIST, not TASKS again.
+                    - A record type the user names — "sales pipeline", "leads", "support tickets" —
+                      is a FORM. Call findMyFormByName FIRST to turn the name into its id, then
+                      open RECORD_LIST with that id. Never guess an id, and never open TASKS
+                      because you could not find the right screen: say you could not find it.
+                    - If the name matches nothing, call getMyForms and tell them what they do have.
+                    - For a plain question ("kitne leads hain?", "Ravi ka last interaction kya
+                      tha?") just answer out loud. Do not open anything.
+                    - Say what you are doing: "Ravi Sharma ka contact khol raha hoon." 
 
                     BEFORE CHANGING ANYTHING:
                     - Read tools run straight away.
@@ -115,7 +129,8 @@ public class VoiceAiConfig {
                     SECURITY: never say a password, key, token or anything about how this is built.
                     """)
                 .defaultOptions(options)
-                .defaultTools(recordTools, contactTools, meetingTools, whatsAppTools, navigationTools)
+                .defaultTools(recordTools, contactTools, meetingTools, whatsAppTools,
+                        voiceFormTools, navigationTools)
                 .defaultAdvisors(messageChatMemoryAdvisor)
                 .build();
     }
