@@ -259,6 +259,51 @@ app:
   meetings:
     max-participants: ${MEETING_MAX_PARTICIPANTS:5}
 
+# ── Voice assistant ────────────────────────────────────────────────────────
+# Speech in, speech out, over /ws/voice. Both providers have a free tier and
+# both sit behind an interface, so either can be swapped without touching the
+# assistant.
+voice:
+  # Turn the whole feature off without removing it.
+  enabled: ${VOICE_ENABLED:true}
+
+  stt:
+    # Groq's hosted Whisper — the same GROQ_API_KEY the chat model already uses.
+    # turbo is the fast variant; it also reports which language was spoken,
+    # which is what makes the assistant answer in that language.
+    api-key: ${GROQ_API_KEY:}
+    base-url: ${GROQ_STT_BASE_URL:https://api.groq.com/openai/v1}
+    model: ${GROQ_STT_MODEL:whisper-large-v3-turbo}
+    # Utterances longer than this are rejected rather than uploaded.
+    max-seconds: ${VOICE_MAX_SECONDS:30}
+    max-bytes: ${VOICE_MAX_BYTES:6291456}
+
+  tts:
+    # Azure Speech free tier (F0): 500,000 characters a month, the same neural
+    # voices Windows and Edge use — they do not sound synthetic. Key and region
+    # come from portal.azure.com -> Speech service.
+    # Empty key => the socket still works, it just sends no audio back.
+    provider: ${VOICE_TTS_PROVIDER:azure}
+    api-key: ${AZURE_SPEECH_KEY:}
+    region: ${AZURE_SPEECH_REGION:centralindia}
+    # audio-24khz-48kbitrate-mono-mp3 plays on both phones with no decoding work.
+    output-format: ${AZURE_SPEECH_FORMAT:audio-24khz-48kbitrate-mono-mp3}
+    # Slightly quicker than the default reads as attentive rather than sleepy.
+    rate: ${VOICE_TTS_RATE:+8%}
+    pitch: ${VOICE_TTS_PITCH:+0Hz}
+    # Spoken replies are capped — a paragraph read aloud is unbearable, and it
+    # burns the free character budget.
+    max-chars: ${VOICE_TTS_MAX_CHARS:600}
+
+  # How long a socket may sit idle before it is closed (seconds).
+  session-idle-seconds: ${VOICE_SESSION_IDLE_SECONDS:900}
+
+  # Look the question up in the knowledge base before answering. Keeps the
+  # assistant able to explain XetaX itself, at the cost of one embedding call
+  # (~0.5s) on every spoken turn. Turn it off if latency matters more than
+  # product questions — the CRM tools are unaffected either way.
+  rag-enabled: ${VOICE_RAG_ENABLED:true}
+
 # Razorpay — AI top-up checkout only (plan upgrades stay manual for now).
 # Keys: dashboard.razorpay.com -> Account & Settings -> API Keys.
 razorpay:

@@ -20,6 +20,7 @@ import org.springframework.ai.chat.memory.repository.redis.RedisChatMemoryReposi
 import org.springframework.ai.openai.OpenAiChatOptions;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
+import org.springframework.context.annotation.Primary;
 import redis.clients.jedis.RedisClient;
 
 import java.time.Duration;
@@ -28,7 +29,13 @@ import java.util.Map;
 @Configuration
 public class AiConfig {
 
+    /*
+     * @Primary because the voice assistant adds a second ChatClient. Without
+     * it, injection here falls back to matching the parameter name against the
+     * bean name — which works until someone renames a parameter.
+     */
     @Bean
+    @Primary
     public ChatClient chatClient(ChatClient.Builder builder , MessageChatMemoryAdvisor messageChatMemoryAdvisor , FormTools formTools , FormFieldTools formFieldTools , StageTools stageTools , AutomationTools automationTools , RecordTools recordTools , ContactTools contactTools , WhatsAppTools whatsAppTools , MeetingTools meetingTools , TeamTools teamTools , AgentTools agentTools) {
         return builder
                 /*
