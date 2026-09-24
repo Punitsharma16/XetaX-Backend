@@ -44,6 +44,7 @@ public class VoiceAiConfig {
                                       MeetingTools meetingTools,
                                       WhatsAppTools whatsAppTools,
                                       NavigationTools navigationTools,
+                                      VoiceModelSelector modelSelector,
                                       @Value("${voice.model:}") String model) {
         var options = OpenAiChatOptions.builder()
                 /*
@@ -56,9 +57,14 @@ public class VoiceAiConfig {
                  */
                 .extraBody(Map.of("include_reasoning", false));
 
-        // A non-reasoning model answers tool rounds far faster, and seconds are
-        // what a spoken turn is made of. Blank falls back to the global model.
-        if (model != null && !model.isBlank()) options.model(model.trim());
+        /*
+         * Blank — the default — leaves the application's own model in place.
+         * A name set here is checked against the account before it is used: an
+         * unavailable one 404s on every single turn, which is a failure the
+         * user discovers by talking to an assistant that never answers.
+         */
+        String chosen = modelSelector.choose(model);
+        if (chosen != null) options.model(chosen);
 
         return ChatClient.builder(chatModel)
                 .defaultSystem("""

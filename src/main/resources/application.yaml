@@ -267,11 +267,13 @@ voice:
   # Turn the whole feature off without removing it.
   enabled: ${VOICE_ENABLED:true}
 
-  # Model for spoken turns only — the panel's assistant keeps the global one.
-  # A reasoning model thinks for a long time on tool calls and a spoken turn is
-  # mostly tool calls, so voice runs on a faster one. Blank = use the global
-  # model (spring.ai.openai.chat.model).
-  model: ${VOICE_MODEL:llama-3.3-70b-versatile}
+  # Model for spoken turns only. Blank — the default — means the application's
+  # own model (spring.ai.openai.chat.model), which is the safe answer: this
+  # account's Groq key carries only gpt-oss-20b and gpt-oss-120b for chat, so
+  # there is no faster non-reasoning model to switch to. Anything set here is
+  # verified against the account at startup and ignored with a loud log line if
+  # it does not exist, rather than 404ing on every spoken turn.
+  model: ${VOICE_MODEL:}
 
   stt:
     # Groq's hosted Whisper — the same GROQ_API_KEY the chat model already uses.
