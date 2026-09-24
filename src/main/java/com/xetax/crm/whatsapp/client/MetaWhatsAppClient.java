@@ -111,17 +111,34 @@ public class MetaWhatsAppClient {
      */
     public JsonNode getSpendAnalytics(String wabaId, String token, long start, long end) {
         try {
-            return get(properties.apiUrl("/" + wabaId
-                    + "?fields=pricing_analytics.start(" + start + ").end(" + end
-                    + ").granularity(MONTHLY).dimensions([%22PRICING_CATEGORY%22])"), token);
+            return get(pricingAnalyticsPath(wabaId, start, end), token);
         } catch (WhatsAppProviderException e) {
             log.info("pricing_analytics unavailable ({}), falling back to conversation_analytics",
                     e.getErrorCode());
-            return get(properties.apiUrl("/" + wabaId
-                    + "?fields=conversation_analytics.start(" + start + ").end(" + end
-                    + ").granularity(MONTHLY).dimensions([%22CONVERSATION_CATEGORY%22])"
-                    + "&metric_types=[%22COST%22,%22CONVERSATION%22]"), token);
+            return get(conversationAnalyticsPath(wabaId, start, end), token);
         }
+    }
+
+    /*
+     * The quotes around a dimension are written as quotes, not as %22.
+     *
+     * <p>RestClient percent-encodes the URL it is handed, so a %22 already in
+     * the string came out the other side as %2522 — Meta then read the literal
+     * characters "%22PRICING_CATEGORY%22" and answered "The parameter
+     * dimensions must be an array", for both the pricing call and the
+     * conversation fallback. Left plain, the encoder produces the %22 itself.
+     */
+    String pricingAnalyticsPath(String wabaId, long start, long end) {
+        return properties.apiUrl("/" + wabaId
+                + "?fields=pricing_analytics.start(" + start + ").end(" + end
+                + ").granularity(MONTHLY).dimensions([\"PRICING_CATEGORY\"])");
+    }
+
+    String conversationAnalyticsPath(String wabaId, long start, long end) {
+        return properties.apiUrl("/" + wabaId
+                + "?fields=conversation_analytics.start(" + start + ").end(" + end
+                + ").granularity(MONTHLY).dimensions([\"CONVERSATION_CATEGORY\"])"
+                + "&metric_types=[\"COST\",\"CONVERSATION\"]");
     }
 
     /** Submits a new template for Meta review. Returns {id, status, category}. */
