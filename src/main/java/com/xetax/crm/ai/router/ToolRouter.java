@@ -2,9 +2,13 @@ package com.xetax.crm.ai.router;
 
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Component;
 
+import java.time.Clock;
+import java.time.ZoneId;
+import java.time.ZonedDateTime;
 import java.util.Arrays;
 import java.util.EnumSet;
 import java.util.HashSet;
@@ -38,14 +42,16 @@ import java.util.regex.Pattern;
  * tool set is most likely to strand.</li>
  * </ol>
  *
- * <p>Measured against the 5,555 tokens the 49 tool schemas cost on Groq and
- * the 1,139 the full prompt costs, the fixed overhead per request drops from
- * 6,694 tokens to:
+ * <p>Calibrated against the 5,555 tokens the original 49 tool schemas cost on
+ * Groq's own API. The panel now has 77 tools — every page that had none got
+ * them — so sending the lot is about 8,600 tokens against a tier that allows
+ * 8,000 a minute. Routed, one request carries:
  *
  * <pre>
- *   CONTACTS  1,369      MEETINGS  1,712      TEAM         2,073
- *   AGENTS    1,664      WHATSAPP  1,895      AUTOMATIONS  2,379
- *   RECORDS   2,110      FORMS     2,938      RECORDS+WA   2,802
+ *   ANALYTICS 1,157   BOOKINGS 1,330   AGENTS   1,492   MENU     1,548
+ *   MEETINGS  1,543   DOCUMENTS 1,624  EMAIL    1,683   WHATSAPP 1,723
+ *   TEAM      1,901   TASKS    1,917   RECORDS  1,957   AUTOMATIONS 2,226
+ *   INVOICES  2,458   FORMS    2,785
  * </pre>
  *
  * <p>On a corpus of real panel questions 84% route; the rest are the generic
@@ -73,17 +79,65 @@ public class ToolRouter {
     private static final Set<ToolDomain> ALL_DOMAINS =
             EnumSet.allOf(ToolDomain.class);
 
+    /**
+     * What a message with no subject gets when the full set will not fit.
+     *
+     * <p>These are orientation tools — the dashboard figure, the records, the
+     * to-do list, the address book. A message the router cannot place is
+     * almost never an action ("hello", "kya kar sakte ho", "XetaX kya hai");
+     * it is a greeting or a knowledge question, and the answer comes from the
+     * prompt and retrieved knowledge rather than from a tool.
+     */
+    private static final Set<ToolDomain> ORIENTATION = EnumSet.of(
+            ToolDomain.ANALYTICS, ToolDomain.RECORDS, ToolDomain.TASKS, ToolDomain.CONTACTS);
+
     private final ToolRegistry registry;
     private final ConversationRoutes routes = new ConversationRoutes();
     private final boolean enabled;
+    private final ZoneId zone;
+    private final Clock clock;
+    /** Domains an unplaceable message falls back to — everything, if it fits. */
+    private final Set<ToolDomain> fallbackDomains;
 
+    @Autowired
     public ToolRouter(ToolRegistry registry,
-                      @Value("${xetax.ai.tool-router.enabled:true}") boolean enabled) {
+                      @Value("${xetax.ai.tool-router.enabled:true}") boolean enabled,
+                      @Value("${xetax.ai.timezone:Asia/Kolkata}") String timezone,
+                      @Value("${xetax.ai.tool-router.max-tool-tokens:3500}") int maxToolTokens) {
+        this(registry, enabled, ZoneId.of(timezone), Clock.systemUTC(), maxToolTokens);
+    }
+
+    /** Test seam: a fixed clock makes the prompt's CONTEXT line assertable. */
+    public ToolRouter(ToolRegistry registry, boolean enabled, ZoneId zone, Clock clock,
+                      int maxToolTokens) {
         this.registry = registry;
         this.enabled = enabled;
-        log.info("AI tool router {} ({} tools registered)",
-                enabled ? "enabled" : "DISABLED — every request carries all tools",
-                registry.names().size());
+        this.zone = zone;
+        this.clock = clock;
+
+        /*
+         * "Send everything" stopped being a safe fallback once the panel's
+         * uncovered pages got tools: 77 schemas is about 8,600 tokens, and the
+         * tier this runs on allows 8,000 a minute in total. An unplaceable
+         * message would have failed outright instead of degrading. So the
+         * fallback is the full set only while the full set fits, and the
+         * orientation set otherwise — and which one it is gets said out loud
+         * at boot rather than discovered in production.
+         */
+        int fullCost = ToolRegistry.estimatedTokens(registry.all());
+        if (fullCost <= maxToolTokens) {
+            this.fallbackDomains = ALL_DOMAINS;
+        }
+        else {
+            this.fallbackDomains = ORIENTATION;
+        }
+        log.info("AI tool router {} — {} tools registered (~{} tokens); "
+                        + "an unplaceable message falls back to {} (~{} tokens, budget {})",
+                enabled ? "enabled" : "DISABLED, every request carries all tools",
+                registry.names().size(), fullCost,
+                this.fallbackDomains == ALL_DOMAINS ? "every tool" : ORIENTATION.toString(),
+                ToolRegistry.estimatedTokens(registry.forDomains(this.fallbackDomains)),
+                maxToolTokens);
     }
 
     /**
@@ -95,7 +149,11 @@ public class ToolRouter {
      */
     public RoutingDecision route(String conversationId, String message) {
         if (!this.enabled) {
-            return fullSet();
+            // The kill switch means "behave as if the router were not here",
+            // so it really does send everything — including past the budget,
+            // which is the caller's decision to make.
+            return new RoutingDecision(ALL_DOMAINS, this.registry.all(),
+                    prompt(ALL_DOMAINS), false);
         }
 
         Set<ToolDomain> matched = match(message);
@@ -109,7 +167,7 @@ public class ToolRouter {
                 // the "what can you do?" case. Behave exactly as before.
                 log.debug("Tool router: no signal, sending all {} tools",
                         this.registry.names().size());
-                return fullSet();
+                return fallback();
             }
             // A follow-up like "haan kar do" — stay where the conversation is.
             this.routes.remember(conversationId, remembered, now);
@@ -133,16 +191,23 @@ public class ToolRouter {
         RoutingDecision decision = new RoutingDecision(
                 Set.copyOf(domains),
                 this.registry.forDomains(domains),
-                AssistantPrompt.forDomains(domains),
+                prompt(domains),
                 true);
         log.debug("Tool router: {} -> {} of {} tools",
                 domains, decision.tools().size(), this.registry.names().size());
         return decision;
     }
 
-    private RoutingDecision fullSet() {
-        return new RoutingDecision(ALL_DOMAINS, this.registry.all(),
-                AssistantPrompt.forDomains(ALL_DOMAINS), false);
+    /** What an unplaceable message gets — everything, or the orientation set. */
+    private RoutingDecision fallback() {
+        return new RoutingDecision(this.fallbackDomains,
+                this.registry.forDomains(this.fallbackDomains),
+                prompt(this.fallbackDomains), false);
+    }
+
+    private String prompt(Set<ToolDomain> domains) {
+        return AssistantPrompt.withClock(AssistantPrompt.forDomains(domains),
+                ZonedDateTime.now(this.clock.withZone(this.zone)));
     }
 
     /**

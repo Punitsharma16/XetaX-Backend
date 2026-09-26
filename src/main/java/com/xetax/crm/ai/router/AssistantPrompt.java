@@ -1,5 +1,7 @@
 package com.xetax.crm.ai.router;
 
+import java.time.ZonedDateTime;
+import java.time.format.DateTimeFormatter;
 import java.util.Set;
 
 /**
@@ -52,6 +54,27 @@ public final class AssistantPrompt {
             """;
 
     private AssistantPrompt() {
+    }
+
+    private static final DateTimeFormatter LOCAL = DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm");
+
+    /**
+     * Tell the model what time it is.
+     *
+     * <p>Nothing used to, so "kal 3 baje" and "tomorrow 10 am" were dated
+     * from whatever the model believed today was — usually its training
+     * cutoff. Every scheduled meeting and every task reminder inherits that
+     * guess, and the user only finds out when the reminder does not arrive.
+     *
+     * <p>The zone is the one the user speaks in; the tools take UTC, so the
+     * line carries both and says which is which.
+     */
+    public static String withClock(String prompt, ZonedDateTime now) {
+        return prompt
+                + "\nCONTEXT: right now it is " + LOCAL.format(now) + " in " + now.getZone()
+                + " (" + now.toInstant() + " UTC). The user means that local zone; tools that"
+                + " take an ISO time want UTC, so convert before calling one. Never guess"
+                + " today's date — take it from here.\n";
     }
 
     /**

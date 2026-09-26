@@ -9,6 +9,7 @@ import java.util.Set;
 import java.util.TreeSet;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 /**
@@ -62,10 +63,45 @@ class ToolRoutingMapTest {
     }
 
     @Test
-    void theAssistantStillHasTheSameFortyNineTools() {
-        // Pins the count the token budget was measured against: 49 schemas,
-        // ~5,555 tokens. A change here should be a deliberate one.
-        assertEquals(49, declaredToolNames().size(), declaredToolNames().toString());
+    void theToolCountIsWhatWeThinkItIs() {
+        // 49 when the router shipped (~5,555 tokens of schema), then tasks,
+        // invoices, email campaigns, bookings, documents, the dashboard and
+        // the online menu — the panel features that had no tools at all.
+        // Pinned so growth stays a decision rather than a drift; the router
+        // is what makes 77 affordable, since a request only carries its own
+        // domain.
+        assertEquals(77, declaredToolNames().size(), declaredToolNames().toString());
+    }
+
+    @Test
+    void everyPanelFeatureTheUserCanOpenHasTools() {
+        // Walked the panel's routes against the tool list. These are the ones
+        // that had nothing behind them.
+        assertTrue(declaredToolNames().contains("getMyInvoices"), "Invoices");
+        assertTrue(declaredToolNames().contains("getEmailCampaigns"), "Email Campaigns");
+        assertTrue(declaredToolNames().contains("getBookingSlots"), "Bookings");
+        assertTrue(declaredToolNames().contains("getMyDocuments"), "Documents");
+        assertTrue(declaredToolNames().contains("getMenuOverview"), "Online Menu");
+        assertTrue(declaredToolNames().contains("getDashboardSummary"), "Dashboard");
+    }
+
+    @Test
+    void nothingCanStartABulkSendOnItsOwn() {
+        // The rule the WhatsApp tools already follow: the assistant drafts a
+        // campaign, the person whose sender reputation is at stake starts it.
+        assertFalse(declaredToolNames().contains("startEmailCampaign"));
+        assertFalse(declaredToolNames().contains("startWhatsAppCampaign"));
+    }
+
+    @Test
+    void theAssistantCanWorkWithTasks() {
+        // It used to answer "I don't have a way to create a task directly
+        // from this interface" while the panel had a whole Tasks section.
+        assertTrue(declaredToolNames().contains("createTask"));
+        assertTrue(declaredToolNames().contains("getMyTasks"));
+        assertTrue(ToolDomain.TASKS.tools().contains("createTask"));
+        // A task is usually hung off a record the user names, not an id.
+        assertTrue(ToolDomain.TASKS.tools().contains("searchRecords"));
     }
 
     @Test

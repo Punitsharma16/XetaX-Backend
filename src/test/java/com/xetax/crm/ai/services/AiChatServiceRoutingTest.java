@@ -7,6 +7,10 @@ import com.xetax.crm.ai.router.ToolRouter;
 import com.xetax.crm.ai.router.ToolBeans;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
+
+import java.time.Clock;
+import java.time.Instant;
+import java.time.ZoneId;
 import org.mockito.ArgumentCaptor;
 import org.springframework.ai.chat.client.ChatClient;
 import org.springframework.ai.tool.ToolCallback;
@@ -37,6 +41,10 @@ import static org.mockito.Mockito.when;
  */
 class AiChatServiceRoutingTest {
 
+    /** A fixed clock so the prompt's CONTEXT line is the same on every run. */
+    private static final Clock FIXED_CLOCK =
+            Clock.fixed(Instant.parse("2026-09-26T08:44:00Z"), ZoneId.of("UTC"));
+
     private static final UUID OWNER = UUID.fromString("11111111-1111-1111-1111-111111111111");
 
     private ChatClient.ChatClientRequestSpec request;
@@ -61,7 +69,7 @@ class AiChatServiceRoutingTest {
         when(rag.retrieveContext(anyString(), any())).thenReturn("NO_RELEVANT_KNOWLEDGE_FOUND");
 
         registry = new ToolRegistry(ToolBeans.instances());
-        service = new AiChatServiceImpl(chatClient, rag, new ToolRouter(registry, true));
+        service = new AiChatServiceImpl(chatClient, rag, new ToolRouter(registry, true, ZoneId.of("Asia/Kolkata"), FIXED_CLOCK, 3500));
     }
 
     @Test
@@ -88,10 +96,16 @@ class AiChatServiceRoutingTest {
     }
 
     @Test
-    void anUnclearQuestionStillGetsEveryTool() {
+    void anUnclearQuestionStillGetsAUsableToolSet() {
         service.chat("fresh", "kya kya kar sakte ho?", OWNER);
 
-        assertEquals(registry.all().size(), capturedToolNames().size());
+        // Not everything any more — 77 schemas is more than the tier allows in
+        // a minute — but enough to answer a vague question about the
+        // workspace, and never nothing.
+        List<String> sent = capturedToolNames();
+        assertTrue(sent.contains("getDashboardSummary"));
+        assertTrue(sent.contains("getRecords"));
+        assertTrue(sent.size() < registry.all().size());
     }
 
     @Test

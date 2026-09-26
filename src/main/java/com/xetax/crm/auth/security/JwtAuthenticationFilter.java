@@ -85,6 +85,30 @@ public class JwtAuthenticationFilter extends OncePerRequestFilter {
         filterChain.doFilter(request, response);
     }
 
+    /**
+     * Authenticate the ASYNC dispatch as well.
+     *
+     * <p>A response that is produced asynchronously — the AI assistant's SSE
+     * stream is the one in this application — comes back through the filters
+     * a second time to be finished. {@code OncePerRequestFilter} sits that
+     * pass out by default, and with STATELESS sessions there is nothing to
+     * restore the authentication either, so {@code
+     * .anyRequest().authenticated()} refused the user's own request on the
+     * way out. The headers and the answer were already committed by then, so
+     * Spring Security could not even turn it into a 401 and logged "Unable to
+     * handle the Spring Security Exception because the response is already
+     * committed" instead. The browser saw a failed request for an answer the
+     * server had already produced, which only showed up after a reload.
+     *
+     * <p>The token is on the same request, so re-reading it here costs one
+     * cached user lookup and makes the second pass look exactly like the
+     * first.
+     */
+    @Override
+    protected boolean shouldNotFilterAsyncDispatch() {
+        return false;
+    }
+
     @Override
     protected boolean shouldNotFilter(HttpServletRequest request) throws ServletException {
         if (request.getDispatcherType().name().equals("ERROR")) {

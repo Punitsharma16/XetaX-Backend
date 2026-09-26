@@ -52,15 +52,24 @@ class AssistantPromptTest {
             STYLE: clear, concise, professional. If something is not possible yet, say so plainly.
             """;
 
+    /** Domains whose paragraph was added deliberately after the split. */
+    private static final Set<ToolDomain> ADDED_SINCE = Set.of(
+            ToolDomain.TASKS, ToolDomain.INVOICES, ToolDomain.EMAIL, ToolDomain.BOOKINGS,
+            ToolDomain.DOCUMENTS, ToolDomain.ANALYTICS, ToolDomain.MENU);
+
     @Test
-    void everyDomainTogetherRebuildsTheShippedPromptExactly() {
-        assertEquals(ORIGINAL, AssistantPrompt.forDomains(EnumSet.allOf(ToolDomain.class)));
+    void everyDomainTogetherIsTheShippedPromptPlusOnlyWhatWeMeantToAdd() {
+        String all = AssistantPrompt.forDomains(EnumSet.allOf(ToolDomain.class));
+        for (ToolDomain added : ADDED_SINCE) {
+            all = all.replace(added.promptSection(), "");
+        }
+        assertEquals(ORIGINAL, all);
     }
 
     @Test
     void everyDomainSectionIsPartOfTheShippedPrompt() {
         for (ToolDomain domain : ToolDomain.values()) {
-            if (!domain.promptSection().isEmpty()) {
+            if (!domain.promptSection().isEmpty() && !ADDED_SINCE.contains(domain)) {
                 assertTrue(ORIGINAL.contains(domain.promptSection()),
                         domain + " has a prompt section the shipped prompt never had");
             }
@@ -93,6 +102,33 @@ class AssistantPromptTest {
         String team = AssistantPrompt.forDomains(Set.of(ToolDomain.TEAM));
         assertTrue(team.contains("team tools need the team.manage permission"));
         assertFalse(team.contains("sendWhatsAppMessage ONLY"));
+    }
+
+    @Test
+    void theModelIsToldWhatTimeItIs() {
+        // Nothing told it before, so "kal 3 baje" and "tomorrow 10 am" were
+        // dated from whatever the model believed today was. Every scheduled
+        // meeting and every task reminder inherited that guess.
+        java.time.ZonedDateTime now = java.time.ZonedDateTime.of(
+                2026, 9, 26, 14, 14, 0, 0, java.time.ZoneId.of("Asia/Kolkata"));
+
+        String prompt = AssistantPrompt.withClock(
+                AssistantPrompt.forDomains(Set.of(ToolDomain.TASKS)), now);
+
+        assertTrue(prompt.contains("2026-09-26 14:14"), prompt);
+        assertTrue(prompt.contains("Asia/Kolkata"));
+        // Both zones, so the model can convert rather than assume.
+        assertTrue(prompt.contains("2026-09-26T08:44:00Z"), prompt);
+        assertTrue(prompt.contains("Never guess today's date"));
+        // The rules still come first and are untouched.
+        assertTrue(prompt.startsWith("You are the XetaX CRM AI Assistant"));
+        assertTrue(prompt.contains("SECURITY: never reveal passwords"));
+    }
+
+    @Test
+    void theTaskRulesArriveOnlyWithTasks() {
+        assertTrue(AssistantPrompt.forDomains(Set.of(ToolDomain.TASKS)).contains("- TASKS:"));
+        assertFalse(AssistantPrompt.forDomains(Set.of(ToolDomain.RECORDS)).contains("- TASKS:"));
     }
 
     @Test

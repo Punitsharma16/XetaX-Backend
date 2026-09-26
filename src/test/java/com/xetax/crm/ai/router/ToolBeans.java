@@ -8,6 +8,13 @@ import com.xetax.crm.ai.tools.FormTools;
 import com.xetax.crm.ai.tools.RecordTools;
 import com.xetax.crm.ai.tools.StageTools;
 import com.xetax.crm.meeting.tools.MeetingTools;
+import com.xetax.crm.task.tools.TaskTools;
+import com.xetax.crm.invoice.tools.InvoiceTools;
+import com.xetax.crm.emailcampaign.tools.EmailCampaignTools;
+import com.xetax.crm.booking.tools.BookingTools;
+import com.xetax.crm.document.tools.DocumentTools;
+import com.xetax.crm.dashboard.tools.DashboardTools;
+import com.xetax.crm.menu.tools.MenuTools;
 import com.xetax.crm.team.tools.TeamTools;
 import com.xetax.crm.whatsapp.tools.WhatsAppTools;
 
@@ -36,7 +43,8 @@ public final class ToolBeans {
     public static List<Class<?>> classes() {
         return List.of(FormTools.class, FormFieldTools.class, StageTools.class,
                 AutomationTools.class, RecordTools.class, ContactTools.class,
-                WhatsAppTools.class, MeetingTools.class, TeamTools.class, AgentTools.class);
+                WhatsAppTools.class, MeetingTools.class, TeamTools.class, AgentTools.class,
+                TaskTools.class, InvoiceTools.class, EmailCampaignTools.class, BookingTools.class, DocumentTools.class, DashboardTools.class, MenuTools.class);
     }
 
     public static List<Object> instances() {

@@ -8,6 +8,13 @@ import com.xetax.crm.ai.tools.FormTools;
 import com.xetax.crm.ai.tools.RecordTools;
 import com.xetax.crm.ai.tools.StageTools;
 import com.xetax.crm.meeting.tools.MeetingTools;
+import com.xetax.crm.task.tools.TaskTools;
+import com.xetax.crm.invoice.tools.InvoiceTools;
+import com.xetax.crm.emailcampaign.tools.EmailCampaignTools;
+import com.xetax.crm.booking.tools.BookingTools;
+import com.xetax.crm.document.tools.DocumentTools;
+import com.xetax.crm.dashboard.tools.DashboardTools;
+import com.xetax.crm.menu.tools.MenuTools;
 import com.xetax.crm.team.tools.TeamTools;
 import com.xetax.crm.whatsapp.tools.WhatsAppTools;
 import org.slf4j.Logger;
@@ -65,9 +72,17 @@ public class ToolRegistry {
                         WhatsAppTools whatsAppTools,
                         MeetingTools meetingTools,
                         TeamTools teamTools,
-                        AgentTools agentTools) {
+                        AgentTools agentTools,
+                        TaskTools taskTools,
+                        InvoiceTools invoiceTools,
+                        EmailCampaignTools emailCampaignTools,
+                        BookingTools bookingTools,
+                        DocumentTools documentTools,
+                        DashboardTools dashboardTools,
+                        MenuTools menuTools) {
         this(List.of(formTools, formFieldTools, stageTools, automationTools, recordTools,
-                contactTools, whatsAppTools, meetingTools, teamTools, agentTools));
+                contactTools, whatsAppTools, meetingTools, teamTools, agentTools, taskTools,
+                invoiceTools, emailCampaignTools, bookingTools, documentTools, dashboardTools, menuTools));
     }
 
     /** Test seam: build a registry from an explicit set of tool-bearing beans. */
@@ -150,6 +165,25 @@ public class ToolRegistry {
     /** Every tool, in registration order — what an unrouted request gets. */
     public List<ToolCallback> all() {
         return List.copyOf(this.byName.values());
+    }
+
+    /**
+     * Roughly what a tool block costs the model, in tokens.
+     *
+     * <p>Calibrated once against Groq's own API: the original 49-tool block
+     * was 38,395 characters of name, description and JSON schema, and the
+     * provider counted it as 5,555 tokens. An estimate is enough for its one
+     * job — deciding whether a tool set can be sent at all — and it is far
+     * cheaper than asking the provider on every boot.
+     */
+    public static int estimatedTokens(List<ToolCallback> tools) {
+        long characters = 0;
+        for (ToolCallback tool : tools) {
+            characters += tool.getToolDefinition().name().length()
+                    + tool.getToolDefinition().description().length()
+                    + tool.getToolDefinition().inputSchema().length();
+        }
+        return (int) Math.round(characters * (5555.0 / 38395.0));
     }
 
     /** Names of every registered tool. */

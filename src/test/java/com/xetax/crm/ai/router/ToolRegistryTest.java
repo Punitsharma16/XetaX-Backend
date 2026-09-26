@@ -27,8 +27,12 @@ class ToolRegistryTest {
 
     @Test
     void itFindsEveryToolTheAssistantHad() {
-        assertEquals(49, registry.all().size());
+        assertEquals(77, registry.all().size());
         assertTrue(registry.names().contains("createRecord"));
+        assertTrue(registry.names().contains("createTask"));
+        assertTrue(registry.names().contains("createInvoice"));
+        assertTrue(registry.names().contains("getBookingSlots"));
+        assertTrue(registry.names().contains("getDashboardSummary"));
         assertTrue(registry.names().contains("sendWhatsAppMessage"));
         assertTrue(registry.names().contains("getAgentEmbedScript"));
     }

@@ -1,6 +1,10 @@
 package com.xetax.crm.ai.router;
 
 import org.junit.jupiter.api.Test;
+
+import java.time.Clock;
+import java.time.Instant;
+import java.time.ZoneId;
 import org.springframework.ai.tool.ToolCallback;
 
 import java.util.ArrayList;
@@ -22,8 +26,12 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
  */
 class ToolRouterTest {
 
+    /** A fixed clock so the prompt's CONTEXT line is the same on every run. */
+    private static final Clock FIXED_CLOCK =
+            Clock.fixed(Instant.parse("2026-09-26T08:44:00Z"), ZoneId.of("UTC"));
+
     private final ToolRegistry registry = new ToolRegistry(ToolBeans.instances());
-    private final ToolRouter router = new ToolRouter(registry, true);
+    private final ToolRouter router = new ToolRouter(registry, true, ZoneId.of("Asia/Kolkata"), FIXED_CLOCK, 3500);
 
     private static List<String> namesOf(List<ToolCallback> callbacks) {
         List<String> names = new ArrayList<>();
@@ -35,6 +43,13 @@ class ToolRouterTest {
 
     private List<String> toolsFor(String conversationId, String message) {
         return namesOf(router.route(conversationId, message).tools());
+    }
+
+    /** The unrouted prompt: every domain's rules, plus the clock line. */
+    private static String fullPrompt() {
+        return AssistantPrompt.withClock(
+                AssistantPrompt.forDomains(EnumSet.allOf(ToolDomain.class)),
+                java.time.ZonedDateTime.now(FIXED_CLOCK.withZone(ZoneId.of("Asia/Kolkata"))));
     }
 
     // ---------------------------------------------------------------- matching
@@ -162,23 +177,44 @@ class ToolRouterTest {
     // ---------------------------------------------------------------- fallback
 
     @Test
-    void aMessageThatSaysNothingGetsEverythingItUsedTo() {
+    void aMessageThatSaysNothingStaysInsideTheRequestBudget() {
+        // "Send everything" stopped being a safe fallback at 77 tools: that is
+        // ~8,600 tokens against a tier that allows 8,000 a minute, so an
+        // unplaceable message would have failed outright instead of degrading.
         RoutingDecision decision = router.route("fresh", "kya kya kar sakte ho?");
 
         assertFalse(decision.narrowed());
+        assertTrue(ToolRegistry.estimatedTokens(decision.tools()) <= 3500,
+                "the fallback is " + ToolRegistry.estimatedTokens(decision.tools()) + " tokens");
+        // Still enough to answer a vague question about the workspace.
+        List<String> tools = namesOf(decision.tools());
+        assertTrue(tools.contains("getDashboardSummary"));
+        assertTrue(tools.contains("getRecords"));
+        assertTrue(tools.contains("getMyTasks"));
+        assertTrue(tools.contains("findMyFormByName"));
+    }
+
+    @Test
+    void aGenerousBudgetStillFallsBackToEverything() {
+        // On a tier that can carry the whole set, the original guarantee holds:
+        // an unplaceable message is exactly the request the panel used to send.
+        ToolRouter roomy = new ToolRouter(registry, true, ZoneId.of("Asia/Kolkata"),
+                FIXED_CLOCK, 100_000);
+
+        RoutingDecision decision = roomy.route("fresh", "kya kya kar sakte ho?");
+
+        assertFalse(decision.narrowed());
         assertEquals(registry.all().size(), decision.tools().size());
-        assertEquals(AssistantPrompt.forDomains(EnumSet.allOf(ToolDomain.class)),
-                decision.systemPrompt());
+        assertEquals(fullPrompt(), decision.systemPrompt());
     }
 
     @Test
     void theKillSwitchRestoresTheOldBehaviourExactly() {
-        ToolRouter off = new ToolRouter(registry, false);
+        ToolRouter off = new ToolRouter(registry, false, ZoneId.of("Asia/Kolkata"), FIXED_CLOCK, 3500);
 
         RoutingDecision decision = off.route("c5", "mere kitne leads hain");
         assertFalse(decision.narrowed());
         assertEquals(namesOf(registry.all()), namesOf(decision.tools()));
-        assertEquals(AssistantPrompt.forDomains(EnumSet.allOf(ToolDomain.class)),
-                decision.systemPrompt());
+        assertEquals(fullPrompt(), decision.systemPrompt());
     }
 }

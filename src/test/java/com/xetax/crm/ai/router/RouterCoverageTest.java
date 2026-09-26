@@ -61,6 +61,27 @@ class RouterCoverageTest {
         PLACEABLE.put("ek naya user banao sales role ke saath", ToolDomain.TEAM);
         PLACEABLE.put("Rahul ke saare records Priya ko transfer kar do", ToolDomain.TEAM);
         PLACEABLE.put("roles aur permissions dikhao", ToolDomain.TEAM);
+        // Verbatim from the conversation where the assistant said it had no
+        // way to create a task.
+        PLACEABLE.put("create a task to call on the number 9034908545 for tomorrow 10 am",
+                ToolDomain.TASKS);
+        PLACEABLE.put("mere pending tasks dikhao", ToolDomain.TASKS);
+        PLACEABLE.put("kal ke liye ek reminder laga do", ToolDomain.TASKS);
+        PLACEABLE.put("is record pr task bna do", ToolDomain.TASKS);
+        PLACEABLE.put("mere pending invoices dikhao", ToolDomain.INVOICES);
+        PLACEABLE.put("kitna paisa aana baaki hai", ToolDomain.INVOICES);
+        PLACEABLE.put("Rahul ka invoice banao 2 AC 45000 ka", ToolDomain.INVOICES);
+        PLACEABLE.put("is invoice pr 10000 payment aa gaya", ToolDomain.INVOICES);
+        PLACEABLE.put("email campaign draft banao", ToolDomain.EMAIL);
+        PLACEABLE.put("mera smtp connected hai kya", ToolDomain.EMAIL);
+        PLACEABLE.put("kal ki bookings dikhao", ToolDomain.BOOKINGS);
+        PLACEABLE.put("ye appointment cancel kar do", ToolDomain.BOOKINGS);
+        PLACEABLE.put("mere documents dikhao", ToolDomain.DOCUMENTS);
+        PLACEABLE.put("Rahul ko brochure bhej do", ToolDomain.DOCUMENTS);
+        PLACEABLE.put("is mahine ka summary do", ToolDomain.ANALYTICS);
+        PLACEABLE.put("business kaisa chal raha hai report do", ToolDomain.ANALYTICS);
+        PLACEABLE.put("paneer tikka aaj band kar do menu se", ToolDomain.MENU);
+        PLACEABLE.put("menu me ek nayi dish add karo", ToolDomain.MENU);
         PLACEABLE.put("website ke liye chatbot banao", ToolDomain.AGENTS);
         PLACEABLE.put("agent ka embed script do", ToolDomain.AGENTS);
         PLACEABLE.put("mere agents dikhao", ToolDomain.AGENTS);
@@ -102,7 +123,7 @@ class RouterCoverageTest {
                 placed++;
             }
         }
-        // Measured at 34/34 here and 84% across the whole corpus including the
+        // Measured at 52/52 here and 84% across the whole corpus including the
         // generic questions. Well below this and the router stops paying for
         // itself.
         assertTrue(placed >= PLACEABLE.size() * 9 / 10,

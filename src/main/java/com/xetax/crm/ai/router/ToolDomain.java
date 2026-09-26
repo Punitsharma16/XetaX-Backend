@@ -103,6 +103,19 @@ public enum ToolDomain {
             - TEAM & ROLES: team tools need the team.manage permission (owners always have it). createTeamRole/createTeamMember/changeMemberRole/transferAllRecords ONLY on explicit request — for roles confirm the exact permission keys first (getPermissionCatalog), for members return the one-time temporary password to the user. If a tool returns a permission error, tell the user their role doesn't allow it.
             """),
 
+    /**
+     * The to-do list. Carries record lookup because a task is usually
+     * attached to a record the user names rather than knows the id of.
+     */
+    TASKS(
+            Set.of("getMyTasks", "getRecordTasks", "createTask", "completeTask", "deleteTask",
+                    "getRecords", "searchRecords"),
+            Set.of("task", "tasks", "todo", "todos", "reminder", "reminders", "remind",
+                    "followup", "pending", "due", "deadline", "call", "calls"),
+            """
+            - TASKS: getMyTasks/getRecordTasks read the signed-in user's own to-do list; createTask adds one. Attach a task to a record or contact by looking it up first (searchRecords/searchMyContacts) and passing its id plus linkedName; leave both out for a personal task. dueAtIso is UTC — convert from the user's local time and never invent a date; an email/WhatsApp reminder needs one. completeTask and deleteTask ONLY on an explicit request.
+            """),
+
     /** The user's own embeddable website chatbots. */
     AGENTS(
             Set.of("getMyAgents", "createAgent", "addAgentTextKnowledge",
@@ -111,6 +124,70 @@ public enum ToolDomain {
                     "embed", "widget", "script"),
             """
             - PUBLIC AGENTS (agents.manage): createAgent/addAgent*Knowledge/getAgentEmbedScript build the user's own embeddable website chatbot. createAgent ONLY on explicit request; after creating, give the embedScript and tell them knowledge (PDF upload is panel-only; text/URL you can add). These agents are public-facing — never put CRM data into their knowledge unless the user explicitly pastes it.
+            """),
+
+    /**
+     * Money. Carries record and contact lookup because an invoice must be
+     * attached to one or the other, and the user names the customer.
+     */
+    INVOICES(
+            Set.of("getMyInvoices", "getInvoiceSummary", "getInvoiceDetails", "getInvoicesFor",
+                    "createInvoice", "recordInvoicePayment", "sendInvoice", "cancelInvoice",
+                    "getRecords", "searchRecords", "getMyContacts"),
+            Set.of("invoice", "invoices", "bill", "bills", "billing", "payment", "payments",
+                    "paid", "unpaid", "outstanding", "receipt", "gst", "tax", "revenue",
+                    "collection", "balance", "paisa", "rupees"),
+            """
+            - INVOICES (invoices.view/manage): getInvoiceSummary answers "how much is outstanding"; getMyInvoices searches by customer name or number. createInvoice must be attached to exactly one of a recordId or a contactId — find the customer first — and is created as a DRAFT. recordInvoicePayment, sendInvoice and cancelInvoice change money or reach the customer: ONLY on an explicit request, and confirm the amounts first.
+            """),
+
+    /**
+     * Bulk email. Carries form lookup because a campaign's audience is a
+     * form's records addressed by one of its fields.
+     */
+    EMAIL(
+            Set.of("getEmailStatus", "getEmailCampaigns", "getEmailCampaignDetails",
+                    "createEmailCampaignDraft", "setEmailCampaignState", "getFormDetails"),
+            Set.of("email", "emails", "mail", "mails", "smtp", "newsletter", "inbox",
+                    "campaign", "campaigns", "bulk", "blast", "subject"),
+            """
+            - EMAIL CAMPAIGNS (email.campaigns): check getEmailStatus first — bulk email goes from the org's own SMTP and needs it configured. createEmailCampaignDraft needs a form slug and the field key holding the address; it creates a DRAFT and you must show the subject and body before saving. NEVER start a campaign — the user starts it from the Email Campaigns page. setEmailCampaignState can PAUSE/RESUME/CANCEL a running one, on explicit request.
+            """),
+
+    /** The appointment book. */
+    BOOKINGS(
+            Set.of("getBookingOverview", "getBookingSlots", "cancelBooking"),
+            Set.of("booking", "bookings", "appointment", "appointments", "slot", "slots",
+                    "walkin", "diary"),
+            """
+            - BOOKINGS (forms.view/manage): getBookingSlots answers who is coming when — dates are yyyy-MM-dd and it defaults to the next seven days. getBookingOverview has the public link and the staff. cancelBooking frees a slot ONLY on an explicit request; the CRM record the booking created stays.
+            """),
+
+    /** The document library. Carries record lookup for personalised sends. */
+    DOCUMENTS(
+            Set.of("getMyDocuments", "sendDocument", "getRecords", "searchRecords"),
+            Set.of("document", "documents", "brochure", "brochures", "pdf", "attachment",
+                    "catalogue", "catalog", "agreement", "letter"),
+            """
+            - DOCUMENTS (documents.view/manage): getMyDocuments lists the uploaded brochures and letters. sendDocument reaches a customer — ONLY on an explicit request; prefer passing the recordId or contactId it is for so the number/address and any {placeholder} variables come from there. Uploading a new document is panel-only.
+            """),
+
+    /** One call for the numbers the Dashboard page shows. */
+    ANALYTICS(
+            Set.of("getDashboardSummary"),
+            Set.of("dashboard", "summary", "overview", "report", "reports", "analytics",
+                    "stats", "statistics", "performance", "insights", "growth"),
+            """
+            - DASHBOARD: getDashboardSummary is the whole workspace in one call. Prefer it over adding several tools' numbers up by hand for broad questions like "how is my business doing".
+            """),
+
+    /** The public online menu — the restaurant pack. */
+    MENU(
+            Set.of("getMenuOverview", "createMenuCategory", "createMenuItem", "updateMenuItem"),
+            Set.of("menu", "dish", "dishes", "restaurant", "food", "cuisine", "veg",
+                    "category", "categories", "storefront"),
+            """
+            - ONLINE MENU (forms.view/manage): read getMenuOverview first — every category and item id comes from it, and you resolve names to ids yourself. updateMenuItem changes only what you pass, so "paneer tikka band kar do" is available=false, not a delete. Orders placed on the public page arrive as RECORDS in the linked form, so use the record tools to read them. Writes ONLY on an explicit request.
             """);
 
     /**

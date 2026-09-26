@@ -267,6 +267,10 @@ razorpay:
 
 xetax:
   ai:
+    # The zone the assistant assumes its users speak in. It goes into the
+    # system prompt so "kal 3 baje" is dated from the real clock instead of
+    # whatever the model thinks today is; tools still take UTC.
+    timezone: ${AI_TIMEZONE:Asia/Kolkata}
     tool-router:
       # Sends only the tools and the prompt paragraphs one message needs
       # instead of all 49 schemas on every request (~6,700 tokens of fixed
@@ -274,6 +278,13 @@ xetax:
       # A message the router cannot place falls back to the full set, so the
       # worst case is the behaviour it replaced. false disables it entirely.
       enabled: ${AI_TOOL_ROUTER_ENABLED:true}
+      # Ceiling for the tool schemas on one request. A message the router
+      # cannot place falls back to every tool while they fit this, and to the
+      # orientation set (dashboard, records, tasks, contacts) when they do
+      # not. All 77 tools are ~8,600 tokens and the tier allows 8,000 a
+      # minute, so on Groq the orientation set is what a vague message gets.
+      # Raise it on a provider with room for everything.
+      max-tool-tokens: ${AI_MAX_TOOL_TOKENS:3500}
   kafka:
     # false = never touch the producer (no broker deployed); events are processed inline.
     publish-enabled: ${KAFKA_PUBLISH_ENABLED:true}
