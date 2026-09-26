@@ -266,6 +266,14 @@ razorpay:
   key-secret: ${RAZORPAY_KEY_SECRET:}
 
 xetax:
+  ai:
+    tool-router:
+      # Sends only the tools and the prompt paragraphs one message needs
+      # instead of all 49 schemas on every request (~6,700 tokens of fixed
+      # overhead on an 8,000 tokens/minute tier — the panel's 413s).
+      # A message the router cannot place falls back to the full set, so the
+      # worst case is the behaviour it replaced. false disables it entirely.
+      enabled: ${AI_TOOL_ROUTER_ENABLED:true}
   kafka:
     # false = never touch the producer (no broker deployed); events are processed inline.
     publish-enabled: ${KAFKA_PUBLISH_ENABLED:true}

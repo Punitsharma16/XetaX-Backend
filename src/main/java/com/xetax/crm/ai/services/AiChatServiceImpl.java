@@ -1,6 +1,8 @@
 package com.xetax.crm.ai.services;
 
 import com.xetax.crm.ai.rag.RagService;
+import com.xetax.crm.ai.router.RoutingDecision;
+import com.xetax.crm.ai.router.ToolRouter;
 import org.springframework.ai.chat.client.ChatClient;
 import org.springframework.ai.chat.memory.ChatMemory;
 import org.springframework.stereotype.Service;
@@ -10,10 +12,12 @@ public class AiChatServiceImpl implements AiChatService {
 
     private final ChatClient chatClient;
     private final RagService ragService;
+    private final ToolRouter toolRouter;
 
-    public AiChatServiceImpl(ChatClient chatClient, RagService ragService) {
+    public AiChatServiceImpl(ChatClient chatClient, RagService ragService, ToolRouter toolRouter) {
         this.chatClient = chatClient;
         this.ragService = ragService;
+        this.toolRouter = toolRouter;
     }
 
     @Override
@@ -21,7 +25,19 @@ public class AiChatServiceImpl implements AiChatService {
 
         String context = ragService.retrieveContext(message, userId);
 
+        /*
+         * The system prompt and the tool schemas are chosen for THIS message
+         * rather than pinned to the ChatClient. They used to be builder
+         * defaults, so a "how many leads do I have" carried the WhatsApp,
+         * meeting, team and agent tools too — ~6,700 tokens of overhead on a
+         * tier that allows 8,000 a minute. When the router finds no signal it
+         * hands back the full set, so the worst case is the old behaviour.
+         */
+        RoutingDecision route = toolRouter.route(conversationId, message);
+
         return chatClient.prompt()
+                .system(route.systemPrompt())
+                .toolCallbacks(route.tools())
                 .user(promptUserSpec ->
                                 promptUserSpec
                                         .text("""
@@ -57,7 +73,10 @@ public class AiChatServiceImpl implements AiChatService {
     public reactor.core.publisher.Flux<String> chatStream(String conversationId, String message,
                                                           java.util.UUID userId) {
         String context = ragService.retrieveContext(message, userId);
+        RoutingDecision route = toolRouter.route(conversationId, message);
         return chatClient.prompt()
+                .system(route.systemPrompt())
+                .toolCallbacks(route.tools())
                 .user(spec -> spec.text("""
                             {context}
 
