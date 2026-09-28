@@ -266,6 +266,12 @@ razorpay:
   key-secret: ${RAZORPAY_KEY_SECRET:}
 
 xetax:
+  billing:
+    # The day Business stopped including unlimited users. Accounts that signed
+    # up before it keep what they were sold (999); accounts opened on or after
+    # it get the catalog's number (8). Nothing is written to existing rows —
+    # each account's own signup date decides.
+    member-limit-changed-at: ${MEMBER_LIMIT_CHANGED_AT:2026-09-28}
   ai:
     # The zone the assistant assumes its users speak in. It goes into the
     # system prompt so "kal 3 baje" is dated from the real clock instead of
