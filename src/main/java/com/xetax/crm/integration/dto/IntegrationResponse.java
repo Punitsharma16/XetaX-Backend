@@ -4,6 +4,8 @@ import com.xetax.crm.integration.enums.IntegrationStatus;
 import com.xetax.crm.integration.enums.IntegrationType;
 import lombok.Data;
 
+import java.time.LocalDateTime;
+
 @Data
 public class IntegrationResponse {
 
@@ -33,5 +35,18 @@ public class IntegrationResponse {
     private String apiKey;
 
     private String endpoint;
+
+    /*
+     * Diagnostics from the last payload this integration received, so the panel
+     * can surface a key that arrived with no mapping instead of leaving the
+     * user to wonder why a field came out blank. The two key lists are
+     * comma-separated.
+     */
+
+    private LocalDateTime lastPayloadAt;
+
+    private String lastIgnoredKeys;
+
+    private String lastUnmatchedFields;
 
 }

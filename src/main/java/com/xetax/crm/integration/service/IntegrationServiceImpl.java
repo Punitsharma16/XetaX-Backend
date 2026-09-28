@@ -3,6 +3,7 @@ package com.xetax.crm.integration.service;
 
 import com.xetax.crm.ai.rag.KnowledgeIndexer;
 import com.xetax.crm.auth.security.CurrentUserProvider;
+import com.xetax.crm.common.exception.BadRequestException;
 import com.xetax.crm.common.exception.ResourceNotFoundException;
 import com.xetax.crm.data_manager.entity.FormEntity;
 import com.xetax.crm.data_manager.repository.FormRepo;
@@ -10,6 +11,7 @@ import com.xetax.crm.data_manager.service.OwnershipGuard;
 import com.xetax.crm.integration.dto.IntegrationRequest;
 import com.xetax.crm.integration.dto.IntegrationResponse;
 import com.xetax.crm.integration.entity.Integration;
+import com.xetax.crm.integration.entity.IntegrationFieldMapping;
 import com.xetax.crm.integration.enums.IntegrationStatus;
 import com.xetax.crm.integration.mapper.IntegrationMapper;
 import com.xetax.crm.integration.repository.IntegrationFieldMappingRepository;
@@ -119,6 +121,39 @@ public class IntegrationServiceImpl implements IntegrationService {
                     return response;
 
                 }).toList();
+    }
+
+    @Override
+    public IntegrationResponse setStatus(Long id, IntegrationStatus status) {
+
+        Integration integration = integrationRepository.findById(id)
+                .orElseThrow(() ->
+                        new ResourceNotFoundException("Integration not found"));
+        ownershipGuard.assertOwned(integration.getForm());
+
+        if (status != IntegrationStatus.ACTIVE && status != IntegrationStatus.DISABLED) {
+            throw new BadRequestException(
+                    "An integration can only be switched to ACTIVE or DISABLED");
+        }
+
+        List<IntegrationFieldMapping> mappings = mappingRepository.findByIntegrationId(id);
+
+        // PENDING means no mapping has been saved yet. Enabling that would
+        // publish an endpoint that accepts payloads and stores nothing from
+        // them, which is worse than refusing the call.
+        if (status == IntegrationStatus.ACTIVE && mappings.isEmpty()) {
+            throw new BadRequestException(
+                    "Save at least one field mapping before enabling this integration");
+        }
+
+        integration.setStatus(status);
+        Integration saved = integrationRepository.save(integration);
+
+        knowledgeIndexer.reindexEntity(IntegrationKnowledge.MODULE, saved.getId(),
+                IntegrationKnowledge.content(saved, mappings),
+                currentUserProvider.currentDataOwnerIdOrNull());
+
+        return buildResponse(saved);
     }
 
     @Override

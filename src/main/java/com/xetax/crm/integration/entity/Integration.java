@@ -7,6 +7,8 @@ import com.xetax.crm.integration.enums.IntegrationType;
 import jakarta.persistence.*;
 import lombok.*;
 
+import java.time.LocalDateTime;
+
 @Entity
 @Table(name = "integrations")
 @Getter
@@ -55,4 +57,23 @@ public class Integration extends BaseEntity {
      */
     @Column(length = 1000)
     private String description;
+
+    /*
+     * Diagnostics from the most recent payload.
+     *
+     * An unmapped key is dropped by design, but it used to be dropped in
+     * silence: the sender saw 200 OK and the record simply came out missing a
+     * field. These three columns are what the panel shows so a rename on the
+     * sending side is visible instead of being hunted for.
+     */
+
+    private LocalDateTime lastPayloadAt;
+
+    /** Comma-separated paths the payload sent that no mapping claimed. */
+    @Column(length = 2000)
+    private String lastIgnoredKeys;
+
+    /** Comma-separated mapped source fields the payload did not carry. */
+    @Column(length = 2000)
+    private String lastUnmatchedFields;
 }

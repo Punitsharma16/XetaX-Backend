@@ -86,7 +86,13 @@ public class IntegrationMappingServiceImpl
             );
         }
         mappingRepository.saveAll(mappings);
-        integration.setStatus(IntegrationStatus.ACTIVE);
+
+        // Saving a mapping is what clears PENDING — that is how an integration
+        // goes live. A DISABLED one stays disabled: editing its configuration
+        // is not a decision to start accepting payloads again.
+        if (integration.getStatus() != IntegrationStatus.DISABLED) {
+            integration.setStatus(IntegrationStatus.ACTIVE);
+        }
         integrationRepository.save(integration);
 
         // Mappings are part of the webhook configuration (and status just

@@ -6,10 +6,12 @@ import com.xetax.crm.common.responce.ApiResponse;
 import com.xetax.crm.common.responce.ResponseUtil;
 import com.xetax.crm.integration.dto.IntegrationRequest;
 import com.xetax.crm.integration.dto.IntegrationResponse;
+import com.xetax.crm.integration.dto.IntegrationStatusRequest;
 import com.xetax.crm.integration.dto.MappingItemResponse;
 import com.xetax.crm.integration.dto.SaveMappingRequest;
 import com.xetax.crm.integration.service.IntegrationMappingService;
 import com.xetax.crm.integration.service.IntegrationService;
+import com.xetax.crm.integration.enums.IntegrationStatus;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.ResponseEntity;
@@ -74,6 +76,27 @@ public class IntegrationController {
                 ResponseUtil.success(
                         "Success",
                         integrationService.getAll()
+                )
+        );
+    }
+
+    /*
+     * The off switch. DISABLED existed in the enum from the start but nothing
+     * ever set it, so the only way to stop an integration was to delete it —
+     * which also threw away its URL, its key and its mappings.
+     */
+    @PatchMapping("/{id}/status")
+    @RequiresPermission("integrations.manage")
+    public ResponseEntity<ApiResponse<IntegrationResponse>> setStatus(
+            @PathVariable Long id,
+            @Valid @RequestBody IntegrationStatusRequest request) {
+
+        return ResponseEntity.ok(
+                ResponseUtil.success(
+                        request.getStatus() == IntegrationStatus.DISABLED
+                                ? "Integration disabled"
+                                : "Integration enabled",
+                        integrationService.setStatus(id, request.getStatus())
                 )
         );
     }
