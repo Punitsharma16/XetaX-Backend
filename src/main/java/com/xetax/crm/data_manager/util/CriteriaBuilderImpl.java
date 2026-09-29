@@ -9,6 +9,7 @@ import org.springframework.data.mongodb.core.query.Criteria;
 import org.springframework.stereotype.Component;
 import org.springframework.util.StringUtils;
 
+import java.time.LocalTime;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
@@ -35,7 +36,44 @@ public class CriteriaBuilderImpl implements CriteriaBuilder {
 
         addDynamicFilters(criteria, request, fields);
 
+        addStageCriteria(criteria, request);
+
+        addCreatedRangeCriteria(criteria, request);
+
         return criteria;
+    }
+
+    /**
+     * stageId is a column on the record itself, not a form field, so the
+     * dynamic filter map above can never reach it.
+     */
+    private void addStageCriteria(List<Criteria> criteria,
+                                  RecordSearchRequest request) {
+        if (request.getStageId() == null) {
+            return;
+        }
+        criteria.add(Criteria.where("stageId").is(request.getStageId()));
+    }
+
+    /**
+     * When the record was created — again the document's own column, not a
+     * date field inside `data`. The bounds are whole days: a record created at
+     * any time on the "to" day is still inside the range.
+     */
+    private void addCreatedRangeCriteria(List<Criteria> criteria,
+                                         RecordSearchRequest request) {
+        if (request.getCreatedFrom() == null && request.getCreatedTo() == null) {
+            return;
+        }
+
+        Criteria criteria1 = Criteria.where("createdAt");
+        if (request.getCreatedFrom() != null) {
+            criteria1.gte(request.getCreatedFrom().atStartOfDay());
+        }
+        if (request.getCreatedTo() != null) {
+            criteria1.lte(request.getCreatedTo().atTime(LocalTime.MAX));
+        }
+        criteria.add(criteria1);
     }
 
     private void addFormCriteria(List<Criteria> criteria,

@@ -47,6 +47,18 @@ public class WhatsAppWebhookProcessor {
             WhatsAppMessageStatus.FAILED, 9
     );
 
+    /**
+     * 1 when a message that has now failed had already been tallied in that
+     * campaign bucket, so the count can be given back.
+     *
+     * <p>previous is never FAILED here — a DLR that does not move the status
+     * forward returns before this.
+     */
+    private static int alreadyCounted(WhatsAppMessageStatus previous,
+                                      WhatsAppMessageStatus bucket) {
+        return RANK.get(previous) >= RANK.get(bucket) ? 1 : 0;
+    }
+
     private final WhatsAppMessageRepository messageRepository;
     private final WhatsAppConversationRepository conversationRepository;
     private final WhatsAppConfigRepository configRepository;
@@ -176,7 +188,8 @@ public class WhatsAppWebhookProcessor {
                 if (pricingChanged) messageRepository.save(message);
                 return; // stale or duplicate DLR — nothing else to do
             }
-            boolean wasDelivered = RANK.get(message.getStatus())
+            WhatsAppMessageStatus previous = message.getStatus();
+            boolean wasDelivered = RANK.get(previous)
                     >= RANK.get(WhatsAppMessageStatus.DELIVERED);
             message.setStatus(newStatus);
             Instant when = timestampOf(status);
@@ -202,6 +215,16 @@ public class WhatsAppWebhookProcessor {
                         if (!wasDelivered) campaignRepository.markOneDelivered(message.getCampaignId());
                         campaignRepository.markOneRead(message.getCampaignId());
                     }
+                    // Meta accepts a message and only then reports it
+                    // undeliverable. This case was missing, so the recipient
+                    // row below went FAILED while the campaign's failedCount
+                    // stayed where it was: the list showed failures and the
+                    // card above it read zero.
+                    case FAILED -> campaignRepository.markOneFailedLate(
+                            message.getCampaignId(),
+                            alreadyCounted(previous, WhatsAppMessageStatus.SENT),
+                            alreadyCounted(previous, WhatsAppMessageStatus.DELIVERED),
+                            alreadyCounted(previous, WhatsAppMessageStatus.READ));
                     default -> { }
                 }
             }

@@ -2,6 +2,7 @@ package com.xetax.crm.whatsapp.dto;
 
 import lombok.Data;
 
+import java.time.LocalDate;
 import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
@@ -23,6 +24,21 @@ public class CampaignCreateRequest {
     private String phoneFieldKey;
     private String search;
     private Map<String, Object> filters = new HashMap<>();
+
+    /*
+     * Narrowing for a RECORDS audience, all optional. `filters` is keyed by
+     * form fieldKey and only reaches inside a record's data, so a stage and
+     * the record's own created date need their own fields.
+     */
+
+    /** Only records sitting in this stage of the form. */
+    private Long stageId;
+
+    /** Records created on or after this day. */
+    private LocalDate createdFrom;
+
+    /** Records created on or before this day. */
+    private LocalDate createdTo;
 
     /** Payload keys mapped in order to the template's {{1}},{{2}}… variables. */
     private List<String> templateParams = new ArrayList<>();

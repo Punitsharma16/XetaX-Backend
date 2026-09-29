@@ -17,6 +17,9 @@ import java.util.Optional;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.anyInt;
+import static org.mockito.ArgumentMatchers.anyLong;
+import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.*;
 
 /**
@@ -115,6 +118,75 @@ class WhatsAppWebhookProcessorTest {
                 .thenReturn(Optional.of(recipient));
         fire("delivered");
         assertEquals(RecipientStatus.DELIVERED, recipient.getStatus());
+    }
+
+    /* -------------------------------------------------------------------
+     * A campaign's Failed card read 0 while the recipient list underneath it
+     * showed failures. The recipient row was moved to FAILED by its own block,
+     * but the campaign-counter switch right above only handled DELIVERED and
+     * READ — a failed DLR fell through its default and nothing was counted.
+     * ------------------------------------------------------------------- */
+
+    @Test
+    void aFailedReportRaisesTheCampaignsFailedCount() {
+        fire("failed");
+
+        assertEquals(WhatsAppMessageStatus.FAILED, message.getStatus());
+        verify(campaignRepository).markOneFailedLate(eq(7L), anyInt(), anyInt(), anyInt());
+    }
+
+    @Test
+    void aMessageThatFailsAfterBeingSentGivesTheSentCountBack() {
+        fire("failed");   // the message was SENT when it arrived
+
+        // Otherwise sent + failed adds up to more recipients than the campaign
+        // has, while the list shows each recipient exactly once.
+        verify(campaignRepository).markOneFailedLate(7L, 1, 0, 0);
+    }
+
+    @Test
+    void aMessageThatFailsAfterDeliveryGivesBothCountsBack() {
+        message.setStatus(WhatsAppMessageStatus.DELIVERED);
+
+        fire("failed");
+
+        verify(campaignRepository).markOneFailedLate(7L, 1, 1, 0);
+    }
+
+    @Test
+    void aMessageThatFailsAfterBeingReadGivesAllThreeBack() {
+        message.setStatus(WhatsAppMessageStatus.READ);
+
+        fire("failed");
+
+        verify(campaignRepository).markOneFailedLate(7L, 1, 1, 1);
+    }
+
+    @Test
+    void theQueueIsLeftAloneOnALateFailure() {
+        fire("failed");
+
+        // markOneFailed also decrements queuedCount, and this recipient left
+        // the queue when it was sent.
+        verify(campaignRepository, never()).markOneFailed(anyLong());
+    }
+
+    @Test
+    void aRepeatedFailedReportCountsOnce() {
+        fire("failed");
+        fire("failed");
+
+        verify(campaignRepository, times(1)).markOneFailedLate(eq(7L), anyInt(), anyInt(), anyInt());
+    }
+
+    @Test
+    void aFailureOutsideACampaignTouchesNoCounters() {
+        message.setCampaignId(null);
+
+        fire("failed");
+
+        assertEquals(WhatsAppMessageStatus.FAILED, message.getStatus());
+        verify(campaignRepository, never()).markOneFailedLate(anyLong(), anyInt(), anyInt(), anyInt());
     }
 
     @Test

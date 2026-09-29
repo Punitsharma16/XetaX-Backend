@@ -72,6 +72,7 @@ class CampaignOutcomeTest {
                 mock(com.xetax.crm.ai.rag.KnowledgeIndexer.class),
                 mock(com.xetax.crm.whatsapp.repository.WhatsAppTemplateRepository.class),
                 mock(com.xetax.crm.whatsapp.service.WhatsAppTemplateVariables.class),
+                mock(com.xetax.crm.data_manager.repository.StageRepo.class),
                 self);
         when(self.getObject()).thenReturn(service);
     }

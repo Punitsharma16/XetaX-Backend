@@ -35,6 +35,32 @@ public interface WhatsAppCampaignRepository extends JpaRepository<WhatsAppCampai
     @Query("UPDATE WhatsAppCampaign c SET c.failedCount = c.failedCount + 1, c.queuedCount = c.queuedCount - 1 WHERE c.id = :id")
     int markOneFailed(@Param("id") Long id);
 
+    /**
+     * A message Meta accepted and then reported undeliverable.
+     *
+     * <p>Not markOneFailed: that one also decrements queuedCount, and this
+     * recipient left the queue when it was sent. The success buckets it was
+     * already tallied in are given back, because the recipient list shows one
+     * status per row — counting it as both sent and failed made the cards add
+     * up to more than the campaign had recipients.
+     *
+     * @param sentBack      1 if it had been counted as sent, else 0
+     * @param deliveredBack 1 if it had been counted as delivered, else 0
+     * @param readBack      1 if it had been counted as read, else 0
+     */
+    @Transactional
+    @Modifying(flushAutomatically = true, clearAutomatically = true)
+    @Query("UPDATE WhatsAppCampaign c SET c.failedCount = c.failedCount + 1,"
+            + " c.sentCount = CASE WHEN c.sentCount >= :sentBack THEN c.sentCount - :sentBack ELSE 0 END,"
+            + " c.deliveredCount = CASE WHEN c.deliveredCount >= :deliveredBack"
+            + " THEN c.deliveredCount - :deliveredBack ELSE 0 END,"
+            + " c.readCount = CASE WHEN c.readCount >= :readBack THEN c.readCount - :readBack ELSE 0 END"
+            + " WHERE c.id = :id")
+    int markOneFailedLate(@Param("id") Long id,
+                          @Param("sentBack") int sentBack,
+                          @Param("deliveredBack") int deliveredBack,
+                          @Param("readBack") int readBack);
+
     @Transactional
     @Modifying(flushAutomatically = true, clearAutomatically = true)
     @Query("UPDATE WhatsAppCampaign c SET c.deliveredCount = c.deliveredCount + 1 WHERE c.id = :id")

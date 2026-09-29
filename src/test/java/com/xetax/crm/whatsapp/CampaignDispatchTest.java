@@ -106,6 +106,7 @@ class CampaignDispatchTest {
                 mock(PhoneNumberService.class), mock(RecordService.class), eventPublisher,
                 new ObjectMapper(), mock(KnowledgeIndexer.class),
                 mock(WhatsAppTemplateRepository.class), mock(WhatsAppTemplateVariables.class),
+                mock(com.xetax.crm.data_manager.repository.StageRepo.class),
                 self);
     }
 

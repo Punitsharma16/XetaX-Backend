@@ -58,6 +58,7 @@ public class WhatsAppCampaignService {
     private final KnowledgeIndexer knowledgeIndexer;
     private final com.xetax.crm.whatsapp.repository.WhatsAppTemplateRepository templateRepository;
     private final WhatsAppTemplateVariables templateVariables;
+    private final com.xetax.crm.data_manager.repository.StageRepo stageRepo;
 
     /**
      * This same service, but through the Spring proxy. Calling
@@ -133,6 +134,9 @@ public class WhatsAppCampaignService {
             search.setSize(200);
             search.setSearch(request.getSearch());
             if (request.getFilters() != null) search.setFilters(request.getFilters());
+            search.setStageId(request.getStageId());
+            search.setCreatedFrom(request.getCreatedFrom());
+            search.setCreatedTo(request.getCreatedTo());
             Page<RecordResponse> batch = recordService.search(request.getFormSlug(), search);
             if (batch.isEmpty()) break;
 
@@ -157,11 +161,47 @@ public class WhatsAppCampaignService {
         }
 
         campaign.setTotalCount(added);
-        campaign.setTargetDescription("Records of form '" + request.getFormSlug() + "'"
-                + (skipped > 0 ? " (" + skipped + " rows skipped: bad/duplicate phone)" : ""));
+        campaign.setTargetDescription(audienceDescription(request, skipped));
         if (added == 0) {
             throw new BadRequestException(
                     "No records with a usable phone number matched — check the phone field and filters");
+        }
+    }
+
+    /**
+     * What the campaign page shows under the campaign's name. The narrowing is
+     * spelled out because an audience of 40 out of 4,000 records is otherwise
+     * indistinguishable from a form that only has 40.
+     */
+    private String audienceDescription(CampaignCreateRequest request, int skipped) {
+        StringBuilder text = new StringBuilder("Records of form '")
+                .append(request.getFormSlug()).append("'");
+
+        if (request.getStageId() != null) {
+            text.append(" in stage ").append(stageName(request));
+        }
+        if (request.getCreatedFrom() != null && request.getCreatedTo() != null) {
+            text.append(" created ").append(request.getCreatedFrom())
+                    .append(" to ").append(request.getCreatedTo());
+        } else if (request.getCreatedFrom() != null) {
+            text.append(" created on or after ").append(request.getCreatedFrom());
+        } else if (request.getCreatedTo() != null) {
+            text.append(" created on or before ").append(request.getCreatedTo());
+        }
+        if (skipped > 0) {
+            text.append(" (").append(skipped).append(" rows skipped: bad/duplicate phone)");
+        }
+        return text.toString();
+    }
+
+    /** The stage's name, or its id when the stage has since been deleted. */
+    private String stageName(CampaignCreateRequest request) {
+        try {
+            return stageRepo.findById(request.getStageId())
+                    .map(stage -> "'" + stage.getName() + "'")
+                    .orElse("#" + request.getStageId());
+        } catch (Exception e) {
+            return "#" + request.getStageId();
         }
     }
 
