@@ -19,11 +19,14 @@ import com.xetax.crm.whatsapp.kafka.WhatsAppEventPublisher;
 import com.xetax.crm.whatsapp.repository.*;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.beans.factory.ObjectProvider;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.PageRequest;
 import org.springframework.scheduling.annotation.Async;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
+import org.springframework.transaction.support.TransactionSynchronization;
+import org.springframework.transaction.support.TransactionSynchronizationManager;
 import org.springframework.web.multipart.MultipartFile;
 
 import java.time.Instant;
@@ -55,6 +58,19 @@ public class WhatsAppCampaignService {
     private final KnowledgeIndexer knowledgeIndexer;
     private final com.xetax.crm.whatsapp.repository.WhatsAppTemplateRepository templateRepository;
     private final WhatsAppTemplateVariables templateVariables;
+
+    /**
+     * This same service, but through the Spring proxy. Calling
+     * processRecipientsAsync on {@code this} bypassed the proxy, so @Async
+     * never applied: when Kafka was unavailable the whole fallback batch ran
+     * on the HTTP request thread, inside start()'s transaction. A campaign of
+     * 100 held the request open for its entire send — the panel sat on a
+     * loader — and a larger one timed out in the browser while the messages
+     * kept going out, so it read as a failure that had in fact half happened.
+     *
+     * <p>WhatsAppMessagingService hit exactly this and is fixed the same way.
+     */
+    private final ObjectProvider<WhatsAppCampaignService> self;
 
     /* ------------------------------------------------------------- create */
 
@@ -275,7 +291,7 @@ public class WhatsAppCampaignService {
         if (!fallback.isEmpty()) {
             log.warn("Kafka unavailable — {} campaign sends running on whatsappExecutor instead",
                     fallback.size());
-            processRecipientsAsync(fallback);
+            dispatchAfterCommit(fallback);
         }
         indexCampaign(campaign);
         return toResponse(campaign);
@@ -322,12 +338,43 @@ public class WhatsAppCampaignService {
             }
         }
         if (!fallback.isEmpty()) {
-            processRecipientsAsync(fallback);
+            dispatchAfterCommit(fallback);
         }
         return toResponse(campaign);
     }
 
     /* ----------------------------------------------------------- workers */
+
+    /**
+     * Hands the fallback batch to the executor once the caller's transaction
+     * has committed — through the proxy, so @Async actually applies and the
+     * HTTP request returns instead of waiting out the whole send.
+     *
+     * <p>Waiting for the commit is what makes it safe: the worker looks each
+     * recipient up by id and only touches a QUEUED one, and those rows are
+     * written by the transaction still open here. Dispatching before it
+     * commits races the worker against rows it cannot see yet.
+     *
+     * <p>With no transaction around the call (schedulers, tests) it goes
+     * straight to the executor.
+     */
+    private void dispatchAfterCommit(List<Long> recipientIds) {
+        if (recipientIds.isEmpty()) {
+            return;
+        }
+        List<Long> batch = List.copyOf(recipientIds);
+        if (!TransactionSynchronizationManager.isSynchronizationActive()) {
+            self.getObject().processRecipientsAsync(batch);
+            return;
+        }
+        TransactionSynchronizationManager.registerSynchronization(
+                new TransactionSynchronization() {
+                    @Override
+                    public void afterCommit() {
+                        self.getObject().processRecipientsAsync(batch);
+                    }
+                });
+    }
 
     @Async("whatsappExecutor")
     public void processRecipientsAsync(List<Long> recipientIds) {

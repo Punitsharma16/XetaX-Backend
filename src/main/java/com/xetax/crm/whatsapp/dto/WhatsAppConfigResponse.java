@@ -17,6 +17,14 @@ public class WhatsAppConfigResponse {
     private String verifiedName;
     private String qualityRating;
     private String accountMode;
+
+    /**
+     * Meta's messaging tier, e.g. TIER_250 / TIER_1K — how many unique
+     * customers this number may message in a day. It was fetched at onboarding
+     * and stored all along, but never sent to the panel, so the one number
+     * that decides whether a campaign can actually go out was invisible.
+     */
+    private String messagingLimit;
     private Instant connectedAt;
     private Instant lastSyncAt;
     private String lastError;

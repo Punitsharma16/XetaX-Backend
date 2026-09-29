@@ -58,6 +58,10 @@ class CampaignOutcomeTest {
         when(recipients.findById(11L)).thenReturn(Optional.of(recipient));
         when(recipients.save(any())).thenAnswer(call -> call.getArgument(0));
 
+        @SuppressWarnings("unchecked")
+        org.springframework.beans.factory.ObjectProvider<WhatsAppCampaignService> self =
+                mock(org.springframework.beans.factory.ObjectProvider.class);
+
         service = new WhatsAppCampaignService(campaigns, recipients, configs,
                 mock(com.xetax.crm.whatsapp.service.WhatsAppConfigService.class),
                 mock(com.xetax.crm.whatsapp.service.WhatsAppMessagingService.class),
@@ -67,7 +71,9 @@ class CampaignOutcomeTest {
                 new com.fasterxml.jackson.databind.ObjectMapper(),
                 mock(com.xetax.crm.ai.rag.KnowledgeIndexer.class),
                 mock(com.xetax.crm.whatsapp.repository.WhatsAppTemplateRepository.class),
-                mock(com.xetax.crm.whatsapp.service.WhatsAppTemplateVariables.class));
+                mock(com.xetax.crm.whatsapp.service.WhatsAppTemplateVariables.class),
+                self);
+        when(self.getObject()).thenReturn(service);
     }
 
     /** Nothing is left open; the rows say one failed and none were sent. */

@@ -97,6 +97,7 @@ public class WhatsAppConfigService {
                 .verifiedName(config.getVerifiedName())
                 .qualityRating(config.getQualityRating())
                 .accountMode(config.getAccountMode())
+                .messagingLimit(config.getMessagingLimit())
                 .connectedAt(config.getConnectedAt())
                 .lastSyncAt(config.getLastSyncAt())
                 .lastError(config.getLastError())
