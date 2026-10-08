@@ -5,6 +5,7 @@ import com.fasterxml.jackson.databind.ObjectMapper;
 import com.xetax.crm.ai.rag.KnowledgeIndexer;
 import com.xetax.crm.auth.security.CurrentUserProvider;
 import com.xetax.crm.common.exception.BadRequestException;
+import com.xetax.crm.emailcampaign.entity.EmailTemplate;
 import com.xetax.crm.common.exception.ResourceNotFoundException;
 import com.xetax.crm.common.exception.UnauthorizedException;
 import com.xetax.crm.common.ratelimit.RateLimiterService;
@@ -82,6 +83,7 @@ public class EmailCampaignService {
     private final EmailCampaignProperties properties;
     private final ObjectMapper objectMapper;
     private final KnowledgeIndexer knowledgeIndexer;
+    private final EmailTemplateService templateService;
 
     /* ------------------------------------------------------------- status */
 
@@ -107,10 +109,26 @@ public class EmailCampaignService {
         if (request.getName() == null || request.getName().isBlank()) {
             throw new BadRequestException("Campaign name is required");
         }
-        if (request.getSubject() == null || request.getSubject().isBlank()) {
+
+        /*
+         * A saved template only pre-fills. Anything typed in the wizard wins,
+         * so loading a template and then editing it behaves the way the person
+         * expects; with no templateId this is exactly the old path.
+         */
+        String subject = request.getSubject();
+        String body = request.getBody();
+        if (request.getTemplateId() != null) {
+            EmailTemplate template = templateService
+                    .findForCampaign(request.getTemplateId(), owner)
+                    .orElseThrow(() -> new BadRequestException("Template not found"));
+            if (subject == null || subject.isBlank()) subject = template.getSubject();
+            if (body == null || body.isBlank()) body = template.getBody();
+        }
+
+        if (subject == null || subject.isBlank()) {
             throw new BadRequestException("Subject is required");
         }
-        if (request.getBody() == null || request.getBody().isBlank()) {
+        if (body == null || body.isBlank()) {
             throw new BadRequestException("Message body is required");
         }
 
@@ -125,8 +143,8 @@ public class EmailCampaignService {
         EmailCampaign campaign = EmailCampaign.builder()
                 .ownerUserId(owner)
                 .name(request.getName().trim())
-                .subject(request.getSubject().trim())
-                .body(request.getBody())
+                .subject(subject.trim())
+                .body(body)
                 .sourceType(sourceType)
                 .status(EmailCampaignStatus.DRAFT)
                 .build();
