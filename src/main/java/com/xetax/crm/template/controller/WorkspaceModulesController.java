@@ -22,10 +22,12 @@ import java.util.stream.Collectors;
 /**
  * Which pack-specific pages this workspace should see.
  *
- * <p>A pack brings a page of its own with it: the Restaurant pack brings the
- * online menu, the Hair Salon pack brings the booking diary. Those pages mean
- * nothing to a workspace that never installed the pack — a law firm has no
- * menu — so the sidebar asks here instead of showing them to everybody.
+ * <p>A pack brings a page of its own with it: the catalogue page comes with
+ * any pack that lists things to pick from (a restaurant's menu, a stores
+ * team's product list); the booking diary comes with any pack that sells a named
+ * person's time in slots (salon, hospital, field services, coaching). Those
+ * pages mean nothing to a workspace that never installed the pack — a law firm
+ * has no menu — so the sidebar asks here instead of showing them to everybody.
  */
 @RestController
 @RequestMapping("/api/workspace")
@@ -44,8 +46,8 @@ public class WorkspaceModulesController {
                 .stream().map(PackInstall::getPackKey).collect(Collectors.toSet());
 
         Map<String, Boolean> out = new LinkedHashMap<>();
-        out.put("menu", installed.contains(MenuService.PACK_KEY));
-        out.put("booking", installed.contains(BookingService.PACK_KEY));
+        out.put("menu", !java.util.Collections.disjoint(installed, MenuService.PACK_KEYS));
+        out.put("booking", !java.util.Collections.disjoint(installed, BookingService.PACK_KEYS));
         return ResponseUtil.success("Modules", out);
     }
 }

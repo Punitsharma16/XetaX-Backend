@@ -40,7 +40,12 @@ import java.util.*;
 public class MenuService {
 
     /** The vertical pack whose installs can take orders. */
-    public static final String PACK_KEY = "restaurant";
+    /**
+     * Packs that get a catalogue page: a restaurant's menu, and a stores
+     * team's product list. Both are "here is what we have, pick what you
+     * want", and both turn a pick into a record in the pack's own pipeline.
+     */
+    public static final Set<String> PACK_KEYS = Set.of("restaurant", "inventory");
 
     private static final long MAX_IMAGE_BYTES = 5L * 1024 * 1024;
 
@@ -76,7 +81,7 @@ public class MenuService {
         MenuStore store = myStore();
         Map<String, Object> out = new LinkedHashMap<>();
         out.put("store", storeView(store));
-        out.put("orderForms", restaurantForms());
+        out.put("orderForms", catalogueForms());
         out.put("categories", categoryRepository.findByStoreIdOrderBySortOrderAscIdAsc(store.getId())
                 .stream().map(this::categoryView).toList());
         out.put("items", itemRepository.findByStoreIdOrderBySortOrderAscIdAsc(store.getId())
@@ -87,9 +92,9 @@ public class MenuService {
     public Map<String, Object> updateStore(StoreUpdate update) {
         MenuStore store = myStore();
         if (update.formId() != null) {
-            boolean allowed = restaurantForms().stream()
+            boolean allowed = catalogueForms().stream()
                     .anyMatch(form -> update.formId().equals(form.get("id")));
-            if (!allowed) throw new BadRequestException("Orders can only go into a Restaurant form of yours");
+            if (!allowed) throw new BadRequestException("Orders can only go into a form this page came with");
             store.setFormId(update.formId());
         }
         if (update.title() != null) store.setTitle(trimTo(update.title(), 120));
@@ -256,7 +261,7 @@ public class MenuService {
     MenuStore myStore() {
         String owner = owner();
         return storeRepository.findFirstByOwnerUserIdOrderByIdAsc(owner).orElseGet(() -> {
-            List<Map<String, Object>> forms = restaurantForms();
+            List<Map<String, Object>> forms = catalogueForms();
             Long formId = forms.isEmpty() ? null : (Long) forms.get(0).get("id");
             String title = forms.isEmpty() ? "Our menu" : String.valueOf(forms.get(0).get("name"));
             return storeRepository.save(MenuStore.builder()
@@ -274,12 +279,12 @@ public class MenuService {
     }
 
     /** Forms this workspace got from the Restaurant pack and still owns, newest first. */
-    List<Map<String, Object>> restaurantForms() {
+    List<Map<String, Object>> catalogueForms() {
         String owner = owner();
         Set<Long> seen = new LinkedHashSet<>();
         List<Map<String, Object>> out = new ArrayList<>();
         for (PackInstall install : packInstallRepository
-                .findByOwnerUserIdAndPackKeyOrderByInstalledAtDesc(owner, PACK_KEY)) {
+                .findByOwnerUserIdAndPackKeyInOrderByInstalledAtDesc(owner, PACK_KEYS)) {
             if (install.getFormId() == null || !seen.add(install.getFormId())) continue;
             formRepo.findById(install.getFormId())
                     .filter(form -> owner.equals(form.getOwnerUserId()))

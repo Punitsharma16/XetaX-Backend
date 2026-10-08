@@ -3,6 +3,7 @@ package com.xetax.crm.template;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.xetax.crm.automation.enums.AutomationActionType;
 import com.xetax.crm.automation.enums.AutomationTrigger;
+import com.xetax.crm.automation.enums.ConditionOperator;
 import com.xetax.crm.data_manager.enums.FieldType;
 import com.xetax.crm.template.model.PackDefinition;
 import org.junit.jupiter.api.DynamicTest;
@@ -112,6 +113,34 @@ class PackIntegrityTest {
             } catch (IllegalArgumentException e) {
                 problems.add(where + " has unknown trigger " + automation.getTrigger());
             }
+            /*
+             * A guard naming a field the form has not got is worse than no
+             * guard: the installer would refuse the whole rule, so the pack
+             * silently ships one automation fewer than it advertises.
+             */
+            if (automation.getConditions() != null) {
+                for (PackDefinition.AutomationGuard guard : automation.getConditions()) {
+                    if (guard.getFieldKey() == null || !fieldKeys.contains(guard.getFieldKey())) {
+                        problems.add(where + " is guarded on '" + guard.getFieldKey()
+                                + "', which is not a field of this pack");
+                    }
+                    try {
+                        ConditionOperator.valueOf(guard.getOperator());
+                    } catch (IllegalArgumentException | NullPointerException e) {
+                        problems.add(where + " uses unknown operator " + guard.getOperator());
+                    }
+                    // A threshold may name another field; that field must exist too.
+                    String value = guard.getValue() == null ? "" : guard.getValue().trim();
+                    if (value.startsWith("{") && value.endsWith("}")) {
+                        String other = value.substring(1, value.length() - 1).trim();
+                        if (!fieldKeys.contains(other)) {
+                            problems.add(where + " compares against '" + other
+                                    + "', which is not a field of this pack");
+                        }
+                    }
+                }
+            }
+
             // The installer drops these on the floor with a log line, so the
             // gallery counted automations the owner never received.
             if (AutomationTrigger.STATUS_CHANGED.name().equals(automation.getTrigger())) {

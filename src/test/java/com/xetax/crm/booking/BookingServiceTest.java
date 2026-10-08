@@ -7,6 +7,7 @@ import com.xetax.crm.booking.entity.BookingStaff;
 import com.xetax.crm.booking.enums.SlotStatus;
 import com.xetax.crm.booking.repository.BookingPageRepository;
 import com.xetax.crm.booking.repository.BookingSlotRepository;
+import com.xetax.crm.booking.repository.SlotBookingRepository;
 import com.xetax.crm.booking.repository.BookingStaffRepository;
 import com.xetax.crm.booking.service.BookingService;
 import com.xetax.crm.booking.service.BookingService.SlotPlan;
@@ -45,6 +46,7 @@ class BookingServiceTest {
     private BookingPageRepository pages;
     private BookingStaffRepository staffRepository;
     private BookingSlotRepository slots;
+    private SlotBookingRepository slotBookings;
     private BookingService service;
     private BookingStaff neha;
 
@@ -72,7 +74,7 @@ class BookingServiceTest {
 
         PackInstall install = PackInstall.builder()
                 .ownerUserId(OWNER.toString()).packKey("salon").formId(20L).build();
-        when(installs.findByOwnerUserIdAndPackKeyOrderByInstalledAtDesc(OWNER.toString(), "salon"))
+        when(installs.findByOwnerUserIdAndPackKeyInOrderByInstalledAtDesc(OWNER.toString(), BookingService.PACK_KEYS))
                 .thenReturn(List.of(install));
         FormEntity form = FormEntity.builder().name("Hair Salon Bookings").slug("hair-salon-bookings")
                 .ownerUserId(OWNER.toString()).build();
@@ -86,7 +88,8 @@ class BookingServiceTest {
         when(staffRepository.findByOwnerUserIdOrderBySortOrderAscIdAsc(OWNER.toString()))
                 .thenReturn(List.of(neha));
 
-        service = new BookingService(pages, staffRepository, slots, installs, formRepo, users);
+        slotBookings = mock(SlotBookingRepository.class);
+        service = new BookingService(pages, staffRepository, slots, slotBookings, installs, formRepo, users);
         ReflectionTestUtils.setField(service, "publicBaseUrl", "https://app.xetacrm.pro");
         ReflectionTestUtils.setField(service, "apiBaseUrl", "https://api.xetacrm.pro");
     }
@@ -157,7 +160,7 @@ class BookingServiceTest {
         LocalDate day = LocalDate.now().plusDays(1);
 
         Map<String, Object> result = service.addSlots(new SlotPlan(
-                List.of(7L), day, day, LocalTime.of(10, 0), LocalTime.of(12, 0), 30, null));
+                List.of(7L), day, day, LocalTime.of(10, 0), LocalTime.of(12, 0), 30, null, null));
 
         // 10:00, 10:30, 11:00, 11:30 — and nothing that would end after closing.
         assertEquals(4, result.get("added"));
@@ -170,7 +173,7 @@ class BookingServiceTest {
         when(slots.existsByStaffIdAndSlotDateAndStartTime(7L, day, LocalTime.of(10, 0))).thenReturn(true);
 
         Map<String, Object> result = service.addSlots(new SlotPlan(
-                List.of(7L), day, day, LocalTime.of(10, 0), LocalTime.of(11, 0), 30, null));
+                List.of(7L), day, day, LocalTime.of(10, 0), LocalTime.of(11, 0), 30, null, null));
 
         assertEquals(1, result.get("added"));
         assertEquals(1, result.get("alreadyThere"));
@@ -183,7 +186,7 @@ class BookingServiceTest {
 
         Map<String, Object> result = service.addSlots(new SlotPlan(
                 List.of(7L), monday, monday.plusDays(6), LocalTime.of(10, 0), LocalTime.of(11, 0), 60,
-                List.of(6, 7)));   // Saturday and Sunday only
+                List.of(6, 7), null));   // Saturday and Sunday only
 
         assertEquals(2, result.get("added"));
     }
@@ -194,7 +197,7 @@ class BookingServiceTest {
         LocalDate day = LocalDate.now().plusDays(1);
 
         assertThrows(BadRequestException.class, () -> service.addSlots(new SlotPlan(
-                List.of(7L), day, day, LocalTime.of(18, 0), LocalTime.of(10, 0), 30, null)));
+                List.of(7L), day, day, LocalTime.of(18, 0), LocalTime.of(10, 0), 30, null, null)));
     }
 
     @Test

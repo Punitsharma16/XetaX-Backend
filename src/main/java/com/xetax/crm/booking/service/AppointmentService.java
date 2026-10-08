@@ -4,10 +4,12 @@ import com.xetax.crm.automation.engine.AutomationEngine;
 import com.xetax.crm.automation.enums.AutomationTrigger;
 import com.xetax.crm.booking.entity.BookingPage;
 import com.xetax.crm.booking.entity.BookingSlot;
+import com.xetax.crm.booking.entity.SlotBooking;
 import com.xetax.crm.booking.entity.BookingStaff;
 import com.xetax.crm.booking.enums.SlotStatus;
 import com.xetax.crm.booking.repository.BookingPageRepository;
 import com.xetax.crm.booking.repository.BookingSlotRepository;
+import com.xetax.crm.booking.repository.SlotBookingRepository;
 import com.xetax.crm.booking.repository.BookingStaffRepository;
 import com.xetax.crm.common.exception.BadRequestException;
 import com.xetax.crm.common.exception.ResourceNotFoundException;
@@ -74,6 +76,7 @@ public class AppointmentService {
     private final BookingPageRepository pageRepository;
     private final BookingStaffRepository staffRepository;
     private final BookingSlotRepository slotRepository;
+    private final SlotBookingRepository slotBookingRepository;
     private final FormRepo formRepo;
     private final FormMetaCache formMetaCache;
     private final DynamicValidationService validationService;
@@ -227,7 +230,7 @@ public class AppointmentService {
         BookingSlot slot = slotRepository.findById(request.slotId())
                 .filter(s -> s.getOwnerUserId().equals(page.getOwnerUserId()))
                 .orElseThrow(() -> new ResourceNotFoundException("That slot is not on offer"));
-        if (slot.getStatus() != SlotStatus.OPEN) {
+        if (slot.getStatus() != SlotStatus.OPEN || slot.getBookedCount() >= slot.getCapacity()) {
             throw new BadRequestException("That slot has just been taken — please pick another one.");
         }
         if (slot.getSlotDate().atTime(slot.getStartTime()).isBefore(LocalDateTime.now())) {
@@ -249,6 +252,19 @@ public class AppointmentService {
         BookingSlot booked = slotRepository.findById(slot.getId()).orElseThrow();
         booked.setRecordId(record.getId());
         slotRepository.save(booked);
+
+        // Every booking also gets its own row. For a one-on-one slot that is
+        // the same thing the slot already says; for a group slot it is the
+        // only place the second person onwards is written down.
+        slotBookingRepository.save(SlotBooking.builder()
+                .ownerUserId(page.getOwnerUserId())
+                .slotId(slot.getId())
+                .customerName(name)
+                .customerPhone(phone)
+                .service(service)
+                .recordId(record.getId())
+                .bookedVia(via)
+                .build());
 
         Map<String, Object> out = new LinkedHashMap<>();
         out.put("ok", true);

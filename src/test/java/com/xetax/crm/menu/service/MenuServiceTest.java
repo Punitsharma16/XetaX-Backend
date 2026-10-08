@@ -58,7 +58,7 @@ class MenuServiceTest {
         when(itemRepository.save(any())).thenAnswer(inv -> inv.getArgument(0));
 
         PackInstall install = PackInstall.builder().ownerUserId(OWNER.toString()).packKey("restaurant").formId(10L).build();
-        when(packInstallRepository.findByOwnerUserIdAndPackKeyOrderByInstalledAtDesc(OWNER.toString(), "restaurant"))
+        when(packInstallRepository.findByOwnerUserIdAndPackKeyInOrderByInstalledAtDesc(OWNER.toString(), MenuService.PACK_KEYS))
                 .thenReturn(List.of(install));
         FormEntity form = FormEntity.builder().name("Restaurant Orders").slug("restaurant-orders")
                 .ownerUserId(OWNER.toString()).build();

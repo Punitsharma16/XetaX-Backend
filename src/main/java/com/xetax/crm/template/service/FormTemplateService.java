@@ -9,6 +9,9 @@ import com.xetax.crm.automation.dto.AutomationRequest;
 import com.xetax.crm.automation.dto.AutomationResponse;
 import com.xetax.crm.automation.enums.AutomationActionType;
 import com.xetax.crm.automation.enums.AutomationTrigger;
+import com.xetax.crm.automation.entity.AutomationConditionRequest;
+import com.xetax.crm.automation.enums.ConditionOperator;
+import com.xetax.crm.automation.service.AutomationConditionService;
 import com.xetax.crm.automation.service.AutomationService;
 import com.xetax.crm.common.exception.BadRequestException;
 import com.xetax.crm.common.exception.ResourceNotFoundException;
@@ -65,6 +68,7 @@ public class FormTemplateService {
     private final FieldService fieldService;
     private final StageService stageService;
     private final AutomationService automationService;
+    private final AutomationConditionService conditionService;
     private final FormRepo formRepo;
     private final FormMetaCache formMetaCache;
     private final CustomPackRepository customPacks;
@@ -192,7 +196,30 @@ public class FormTemplateService {
                     req.setEmailMessage(a.getEmailMessage());
                     req.setChannel(a.getChannel());
                     req.setActive(false); // user reviews, then switches on
-                    automationService.create(req);
+                    AutomationResponse created = automationService.create(req);
+
+                    /*
+                     * Guards are saved separately, against field ids. A rule
+                     * whose field the form no longer has would fire on every
+                     * save instead of never, so the whole rule is dropped
+                     * rather than installed unguarded.
+                     */
+                    if (a.getConditions() != null && !a.getConditions().isEmpty()) {
+                        List<AutomationConditionRequest> guards = new ArrayList<>();
+                        for (PackDefinition.AutomationGuard c : a.getConditions()) {
+                            Long fieldId = fieldIdByKey.get(c.getFieldKey());
+                            if (fieldId == null) {
+                                throw new IllegalStateException(
+                                        "condition field '" + c.getFieldKey() + "' is not on this form");
+                            }
+                            AutomationConditionRequest guard = new AutomationConditionRequest();
+                            guard.setFormFieldId(fieldId);
+                            guard.setOperator(ConditionOperator.valueOf(c.getOperator()));
+                            guard.setValue(c.getValue());
+                            guards.add(guard);
+                        }
+                        conditionService.saveConditions(created.getId(), guards);
+                    }
                     automationCount++;
                 } catch (Exception e) {
                     log.warn("Pack automation '{}' skipped: {}", a.getName(), e.getMessage());

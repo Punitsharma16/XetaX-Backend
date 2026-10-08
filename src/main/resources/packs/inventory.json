@@ -47,6 +47,34 @@
       "fieldType": "NUMBER",
       "required": false,
       "optionsJson": null
+    },
+    {
+      "label": "Reorder Level",
+      "fieldKey": "reorder_level",
+      "fieldType": "NUMBER",
+      "required": false,
+      "optionsJson": null
+    },
+    {
+      "label": "Unit Price",
+      "fieldKey": "unit_price",
+      "fieldType": "NUMBER",
+      "required": false,
+      "optionsJson": null
+    },
+    {
+      "label": "Requested By",
+      "fieldKey": "requested_by",
+      "fieldType": "TEXT",
+      "required": false,
+      "optionsJson": null
+    },
+    {
+      "label": "Requester Phone",
+      "fieldKey": "requester_phone",
+      "fieldType": "TEXT",
+      "required": false,
+      "optionsJson": null
     }
   ],
   "stages": [
@@ -145,6 +173,49 @@
       "emailSubject": null,
       "emailMessage": null,
       "note": "Raise stock on receipt — adjust the quantity to suit you"
+    },
+    {
+      "name": "Chase the delivery",
+      "trigger": "STAGE_CHANGED",
+      "triggerStageCode": "ORDERED",
+      "triggerStatusName": null,
+      "actionType": "CREATE_TASK",
+      "actionFieldKey": null,
+      "actionValue": "Follow up with {supplier} on {item_name}",
+      "emailSubject": null,
+      "emailMessage": null,
+      "note": "Ordered is where things go quiet — a task keeps the delivery chased"
+    },
+    {
+      "name": "Tell the requester it arrived",
+      "trigger": "STAGE_CHANGED",
+      "triggerStageCode": "RECEIVED",
+      "triggerStatusName": null,
+      "actionType": "SEND_WHATSAPP",
+      "actionFieldKey": "requester_phone",
+      "actionValue": null,
+      "emailSubject": null,
+      "emailMessage": "{requested_by} ji, {item_name} aa gaya hai ({quantity} nos). Stock mein chadha diya gaya hai.",
+      "note": "Whoever raised the request hears the moment the goods land"
+    },
+    {
+      "name": "Low stock alert",
+      "trigger": "RECORD_UPDATED",
+      "triggerStageCode": null,
+      "triggerStatusName": null,
+      "actionType": "SEND_EMAIL",
+      "actionFieldKey": "supplier_email",
+      "actionValue": null,
+      "emailSubject": "Low stock - {item_name}",
+      "emailMessage": "{item_name} is down to {current_stock}, below its reorder level of {reorder_level}.\nPlease quote for a fresh supply.\n\nSKU: {sku}",
+      "note": "Fires only while current_stock is under reorder_level - see conditions",
+      "conditions": [
+        {
+          "fieldKey": "current_stock",
+          "operator": "LESS_THAN",
+          "value": "{reorder_level}"
+        }
+      ]
     }
   ],
   "industry": "Procurement / Inventory",
@@ -216,6 +287,28 @@
         "templateName": null,
         "message": "Hello {supplier}, our order for {item_name} ({quantity}) is still pending on our side. Could you share the dispatch status?",
         "templateParams": []
+      }
+    ]
+  },
+  "agent": {
+    "name": "Procurement Assistant",
+    "persona": "You are a precise, unhurried procurement assistant for a stores team. Take stock requests, confirm the item, how many and who is asking, and say what stock is on hand when you know it. Quote only prices and suppliers you can see in the knowledge; never invent a rate or a delivery date. Hand off to a person for approvals, payment terms or anything about a disputed delivery.",
+    "welcomeMessage": "Hi! Tell me what you need and how many, and I'll raise the request.",
+    "handoffKeywords": "approve, payment, invoice, dispute, return, urgent, human, manager",
+    "pipelineMode": "SUGGEST",
+    "captureFields": true,
+    "stageHints": [
+      {
+        "stageCode": "REQUESTED",
+        "hint": "the item and quantity are known"
+      },
+      {
+        "stageCode": "ORDERED",
+        "hint": "a supplier has been chosen and the order placed"
+      },
+      {
+        "stageCode": "RECEIVED",
+        "hint": "the goods have physically arrived"
       }
     ]
   }

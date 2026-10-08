@@ -89,6 +89,20 @@ public class PackDefinition {
         private String emailMessage;
         private String note;
         private String channel;
+        /** Optional guards; the rule fires only while all of them hold. */
+        private List<AutomationGuard> conditions;
+    }
+
+    /**
+     * A guard on a pack automation. Named apart from the playbook's own
+     * Condition, which is a different thing with a different shape.
+     */
+    @Data
+    public static class AutomationGuard {
+        private String fieldKey;
+        private String operator;
+        /** A literal, or {other_field_key} to compare against another field. */
+        private String value;
     }
 
     @Data

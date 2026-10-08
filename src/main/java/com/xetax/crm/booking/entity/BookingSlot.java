@@ -11,10 +11,15 @@ import java.time.LocalTime;
 /**
  * One bookable slot of one staff member — the only thing a customer can pick.
  *
- * <p>The unique key on (staff, date, start) is what makes double booking
- * impossible: a slot is claimed with a conditional update that only succeeds
- * while it is still OPEN, so whoever gets there first keeps it, whether they
+ * <p>The unique key on (staff, date, start) plus a conditional update is what
+ * makes overbooking impossible: a seat is claimed only while bookedCount is
+ * still below capacity, so whoever gets there first keeps it, whether they
  * came from the public page, the WhatsApp bot or the website chat.
+ *
+ * <p>capacity is 1 by default — one person, one slot, which is how a chair, a
+ * doctor's OPD turn and a technician's visit all work. A workspace that runs
+ * group sessions (a demo class, a batch) raises it, and the same slot then
+ * takes that many bookings before it closes.
  */
 @Entity
 @Table(name = "booking_slots",
@@ -51,7 +56,30 @@ public class BookingSlot extends BaseEntity {
     @Column(nullable = false, length = 10)
     private SlotStatus status;
 
+    /**
+     * How many people this slot takes. 1 means one-on-one.
+     *
+     * <p>columnDefinition carries the default into the DDL as well: without it
+     * the column added to an existing table lands as 0 on every row already
+     * there, and a slot with no seats can never be booked again.
+     */
+    @Builder.Default
+    @Column(nullable = false, columnDefinition = "int not null default 1")
+    private int capacity = 1;
+
+    /** How many of those seats are gone. Moved only by the atomic claim/release. */
+    @Builder.Default
+    @Column(name = "booked_count", nullable = false, columnDefinition = "int not null default 0")
+    private int bookedCount = 0;
+
     /* ------------------------------------------------- filled once booked */
+
+    /*
+     * For a one-on-one slot these are the booking. Where capacity is more than
+     * one they mirror the latest booking, and the full list lives in
+     * SlotBooking — so everything that read a slot before capacity existed
+     * still reads the same thing.
+     */
 
     /** The CRM record this booking became — the booking's home in the pipeline. */
     @Column(name = "record_id", length = 64)

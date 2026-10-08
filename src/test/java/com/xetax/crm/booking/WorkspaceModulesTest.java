@@ -65,4 +65,34 @@ class WorkspaceModulesTest {
         assertTrue(modules.get("menu"));
         assertTrue(modules.get("booking"));
     }
+
+    /* The diary is not a salon thing — it belongs to any pack that sells a
+       named person's time in dated slots. */
+
+    @Test
+    void aClinicSeesTheDiaryForItsDoctors() {
+        assertTrue(modulesFor("hospital").get("booking"));
+    }
+
+    @Test
+    void fieldServicesSeesTheDiaryForItsTechnicians() {
+        assertTrue(modulesFor("services").get("booking"));
+    }
+
+    @Test
+    void coachingSeesTheDiaryForItsDemoSessions() {
+        assertTrue(modulesFor("coaching").get("booking"));
+    }
+
+    @Test
+    void theDiaryStaysAwayFromPacksWithNoAppointments() {
+        for (String pack : List.of("restaurant", "sales", "support", "inventory", "real_estate")) {
+            assertFalse(modulesFor(pack).get("booking"), pack + " should not get the booking diary");
+        }
+    }
+
+    @Test
+    void aClinicStillSeesNoMenu() {
+        assertFalse(modulesFor("hospital").get("menu"));
+    }
 }

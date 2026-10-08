@@ -4,6 +4,10 @@ public enum ConditionOperator {
 
     EQUALS,
 
-    NOT_EQUALS
+    NOT_EQUALS,
+
+    LESS_THAN,
+
+    GREATER_THAN
 
 }

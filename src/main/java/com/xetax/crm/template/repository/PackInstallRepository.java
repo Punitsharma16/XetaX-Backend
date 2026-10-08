@@ -3,11 +3,16 @@ package com.xetax.crm.template.repository;
 import com.xetax.crm.template.entity.PackInstall;
 import org.springframework.data.jpa.repository.JpaRepository;
 
+import java.util.Collection;
 import java.util.List;
 
 public interface PackInstallRepository extends JpaRepository<PackInstall, Long> {
     List<PackInstall> findByOwnerUserIdOrderByInstalledAtDesc(String ownerUserId);
     List<PackInstall> findByOwnerUserIdAndPackKeyOrderByInstalledAtDesc(String ownerUserId, String packKey);
+
+    /** The booking diary serves several packs, so it asks for all of them at once. */
+    List<PackInstall> findByOwnerUserIdAndPackKeyInOrderByInstalledAtDesc(
+            String ownerUserId, Collection<String> packKeys);
 
     /** A pack is installed as long as its form exists — deleting the form uninstalls it. */
     void deleteByFormId(Long formId);

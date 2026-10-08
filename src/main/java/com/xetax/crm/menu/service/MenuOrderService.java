@@ -56,6 +56,18 @@ public class MenuOrderService {
     static final String F_TYPE = "order_type";
     static final String F_ADDRESS = "address";
 
+    /*
+     * A stores team's form is a different shape: one line is one request, with
+     * its own item and quantity. Which set is used is decided by the form's
+     * own fields, not by the pack it came from — an owner may have edited it.
+     */
+    static final String F_ITEM = "item_name";
+    static final String F_QUANTITY = "quantity";
+    static final String F_UNIT_PRICE = "unit_price";
+    static final String F_REQUESTED_BY = "requested_by";
+    static final String F_REQUESTER_PHONE = "requester_phone";
+    static final String F_NOTES = "notes";
+
     private final MenuStoreRepository storeRepository;
     private final MenuCategoryRepository categoryRepository;
     private final MenuItemRepository itemRepository;
@@ -202,6 +214,17 @@ public class MenuOrderService {
         // Only the keys this form still has — an owner may have edited the pack's form.
         List<FormField> fields = formMetaCache.getFields(form.getId());
         Set<String> keys = fields.stream().map(FormField::getFieldKey).collect(Collectors.toSet());
+
+        /*
+         * A stores form has no field an order list would fit in: item and
+         * quantity are single, required fields. One record per line is the
+         * faithful reading — each product becomes its own request, which is
+         * what the Requested → Approved → Ordered pipeline expects.
+         */
+        if (!keys.contains(F_ITEMS) && keys.contains(F_ITEM) && keys.contains(F_QUANTITY)) {
+            return placeStockRequests(form, fields, keys, quantities, items, name, phone, note, currency);
+        }
+
         Map<String, Object> data = new LinkedHashMap<>();
         putIf(keys, data, F_NAME, name);
         putIf(keys, data, F_PHONE, phone);
@@ -242,6 +265,72 @@ public class MenuOrderService {
         out.put("reference", reference);
         out.put("total", total);
         out.put("message", "Order placed! We will confirm it shortly.");
+        return out;
+    }
+
+    /**
+     * The catalogue order as a stores team reads it: one record per product,
+     * each starting in the form's first stage so the pack's own approval
+     * automations pick it up exactly as a typed-in request would.
+     */
+    private Map<String, Object> placeStockRequests(
+            FormEntity form, List<FormField> fields, Set<String> keys,
+            Map<Long, Integer> quantities, Map<Long, MenuItem> items,
+            String name, String phone, String note, String currency) {
+
+        FormStage defaultStage = formMetaCache.getStages(form.getId()).stream()
+                .filter(s -> Boolean.TRUE.equals(s.getIsDefault()))
+                .findFirst()
+                .orElseThrow(() -> new BadRequestException("This page is not taking requests right now"));
+
+        List<String> references = new ArrayList<>();
+        BigDecimal total = BigDecimal.ZERO;
+
+        for (Map.Entry<Long, Integer> entry : quantities.entrySet()) {
+            MenuItem item = items.get(entry.getKey());
+            BigDecimal unit = effectivePrice(item);
+            total = total.add(unit.multiply(BigDecimal.valueOf(entry.getValue())));
+
+            Map<String, Object> data = new LinkedHashMap<>();
+            putIf(keys, data, F_ITEM, item.getName());
+            putIf(keys, data, F_QUANTITY, entry.getValue());
+            putIf(keys, data, F_UNIT_PRICE, unit);
+            putIf(keys, data, F_REQUESTED_BY, name);
+            putIf(keys, data, F_REQUESTER_PHONE, phone);
+            // The note belongs to the order, so every line carries it.
+            if (note != null) putIf(keys, data, F_NOTES, note);
+
+            RecordRequest recordRequest = new RecordRequest();
+            recordRequest.setData(data);
+            Map<String, Object> validated = validationService.validate(recordRequest, fields);
+
+            RecordDocument saved = recordRepo.save(RecordDocument.builder()
+                    .formId(form.getId())
+                    .stageId(defaultStage.getId())
+                    .data(validated)
+                    .createdBy("public-menu")
+                    .createdAt(LocalDateTime.now())
+                    .updatedAt(LocalDateTime.now())
+                    .build());
+
+            automationEngine.execute(AutomationTrigger.RECORD_CREATED, form, saved);
+            if (saved.getId() != null) {
+                references.add(saved.getId().substring(Math.max(0, saved.getId().length() - 6)).toUpperCase());
+            }
+        }
+
+        notificationService.push(form.getOwnerUserId(), form.getOwnerUserId(), "RECORD_CREATED",
+                references.size() == 1 ? "New stock request" : references.size() + " new stock requests",
+                name + " · " + format(currency, total),
+                "/app/records/" + form.getSlug());
+
+        Map<String, Object> out = new LinkedHashMap<>();
+        out.put("ok", true);
+        out.put("reference", String.join(", ", references));
+        out.put("total", total);
+        out.put("message", references.size() == 1
+                ? "Request raised! We will confirm it shortly."
+                : references.size() + " requests raised! We will confirm them shortly.");
         return out;
     }
 

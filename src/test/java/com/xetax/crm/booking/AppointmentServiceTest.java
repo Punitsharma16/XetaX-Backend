@@ -7,6 +7,7 @@ import com.xetax.crm.booking.entity.BookingStaff;
 import com.xetax.crm.booking.enums.SlotStatus;
 import com.xetax.crm.booking.repository.BookingPageRepository;
 import com.xetax.crm.booking.repository.BookingSlotRepository;
+import com.xetax.crm.booking.repository.SlotBookingRepository;
 import com.xetax.crm.booking.repository.BookingStaffRepository;
 import com.xetax.crm.booking.service.AppointmentService;
 import com.xetax.crm.common.exception.BadRequestException;
@@ -47,6 +48,7 @@ class AppointmentServiceTest {
     private BookingPageRepository pages;
     private BookingStaffRepository staffRepository;
     private BookingSlotRepository slots;
+    private SlotBookingRepository slotBookings;
     private RecordRepo records;
     private AutomationEngine automations;
     private NotificationService notifications;
@@ -103,7 +105,8 @@ class AppointmentServiceTest {
         when(staffRepository.findById(7L)).thenReturn(Optional.of(neha));
         when(staffRepository.findById(8L)).thenReturn(Optional.of(offToday));
 
-        service = new AppointmentService(pages, staffRepository, slots, formRepo, meta,
+        slotBookings = mock(SlotBookingRepository.class);
+        service = new AppointmentService(pages, staffRepository, slots, slotBookings, formRepo, meta,
                 validation, records, automations, notifications);
     }
 

@@ -99,4 +99,11 @@ public class BookingController {
     public ApiResponse<Map<String, Object>> cancelBooking(@PathVariable Long id) {
         return ResponseUtil.success("Booking cancelled", bookingService.cancelBooking(id));
     }
+
+
+    @PostMapping("/slots/{id}/bookings/{bookingId}/cancel")
+    @RequiresPermission("forms.manage")
+    public ApiResponse<Map<String, Object>> cancelOneBooking(@PathVariable Long id, @PathVariable Long bookingId) {
+        return ResponseUtil.success("Booking cancelled", bookingService.cancelBooking(id, bookingId));
+    }
 }
